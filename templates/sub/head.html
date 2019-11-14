@@ -1,0 +1,7 @@
+{% extends "bootstrap/base.html" %}
+{% import "bootstrap/fixes.html" as fixes %}
+<title>{% block title %}{{ typeList }} List{% endblock %}</title>
+{% block styles -%}
+	{{ super() }}
+{% endblock %}
+{{fixes.ie8()}}

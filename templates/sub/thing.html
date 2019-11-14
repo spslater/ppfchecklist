@@ -1,0 +1,15 @@
+{% with header=thing|title %}
+	{% include "sub/header.html" %}
+{% endwith %}
+
+{% with type=thing %}
+	{% include "sub/form.html" %}
+{% endwith %}
+
+{% with todo=todo, type=thing, idx=idx %}
+	{% include "sub/todo.html" %}
+{% endwith %}
+
+{% with done=done %}
+	{% include "sub/done.html" %}
+{% endwith %}

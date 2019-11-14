@@ -1,0 +1,18 @@
+{% extends "bootstrap/base.html" %}
+{% import "bootstrap/fixes.html" as fixes %}
+
+{% block head %}
+	{% with typeList="Everything" %}
+		{% include "sub/head.html" %}
+	{% endwith %}
+{% endblock %}
+
+{% block body %}
+	{% for t in things %}
+	<div>
+		{% with thing=t.thing, done=t.done, todo=t.todo, idx=True %}
+			{% include "sub/thing.html" %}
+		{% endwith %}
+	</div>
+	{% endfor %}
+{% endblock %}

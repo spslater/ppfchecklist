@@ -1,0 +1,30 @@
+<!-- Todo List --> 
+{% if todo|length > 0 %}
+<div class="container" style="font-size:300%">
+	{% for t in todo %}
+	<div class="row">
+		<div class="col-sm-12">
+			<form action="/update/{{ type }}{% if idx %}?idx={{ idx }}{% else %}#{{ type|title }}{% endif %}" method="POST">
+				<div class="form-row">
+					<div class="form-group col-xs-2 col-sm-1">
+						<b>{{ t.position }}</b>
+						<input class="form-control" type="hidden" id="old" name="old" value="{{ t.position }}">
+					</div>
+					<div class="form-group col-xs-10 col-sm-8">
+						{{ t.name }}
+						<input class="form-control" type="hidden" id="name" name="name" value="{{ t.name }}">
+					</div>
+					<div class="form-group col-xs-8 col-sm-2">
+						<input class="form-control" type="number" id="new" name="new" placeholder="{{ t.position }}">
+					</div>
+					<div class="form-group col-xs-4 col-sm-1">
+						<button type="submit" class="btn btn-primary">Update</button>
+					</div>
+				</div>
+			</form>
+		</div>
+	</div>
+	<hr>
+	{% endfor %}
+</div>
+{% endif %}

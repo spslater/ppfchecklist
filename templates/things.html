@@ -1,0 +1,14 @@
+{% extends "bootstrap/base.html" %}
+{% import "bootstrap/fixes.html" as fixes %}
+
+{% block head %}
+	{% with typeList=thing|title %}
+		{% include "sub/head.html" %}
+	{% endwith %}
+{% endblock %}
+
+{% block body %}
+	{% with thing=thing, done=done, todo=todo %}
+		{% include "sub/thing.html" %}
+	{% endwith %}
+{% endblock %}

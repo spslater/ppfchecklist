@@ -1,0 +1,13 @@
+<!-- Done List --> 
+{% if done|length > 0 %}
+<div class="container" style="font-size:200%">
+	<h2>Completed</h2>
+	{% for d in done %}
+	<div class="row">
+		<div class="col-sm-2">{{ d.date }}</div>
+		<div class="col-sm-10">{{ d.name }}</div>
+	</div>
+	{% endfor %}
+	<hr>
+</div>
+{% endif %}
