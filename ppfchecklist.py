@@ -1,8 +1,7 @@
 from datetime import datetime
 from json import load
 from os.path import join
-from pprint import pformat
-from sys import argv
+from sys import argv, maxsize
 
 
 class TableNotFoundError(Exception):
@@ -54,11 +53,16 @@ def getList(all_items):
 def genDoc(form, db):
     maxPos = max([int(a["position"]) for a in db]) if len(db) else 0
 
-    pos = int(form["position"])
-    position = pos if (0 < pos <= maxPos) else maxPos + 1
-    name = form["name"]
+    pos = (
+        int(form["position"] if form["position"] else maxsize)
+        if (int(form["position"]) > 0)
+        else 0
+    )
+    position = pos if (pos <= maxPos) else maxPos + 1
+    name = form["name"].strip()
+    date = form["date"]
 
-    return {"position": position, "name": name}
+    return {"position": position, "name": name, "date": date}
 
 
 @app.route("/favicon.ico")
@@ -88,12 +92,19 @@ def index():
 
 def postNewThing(doc, db, uri, ip):
     try:
-        db.update(increment("position"), where("position") >= doc["position"])
-        db.insert(doc)
+        if doc["position"] > 0:
+            db.update(increment("position"), where("position") >= doc["position"])
+            doc.pop("date", None)
+            db.insert(doc)
+        elif doc["position"] <= 0:
+            doc["position"] = 0
+            if not doc["date"]:
+                doc["date"] = datetime.now().strftime("%Y-%m-%d")
+            db.insert(doc)
         log(f"[INFO]: POST /{uri}\t{ip} - {str(doc)}")
     except Exception as e:
         log(f"[ERROR]: POST /{uri}\t{ip} - {str(doc)}")
-        log(f"              \t{str(e)}")
+        log(f"              {str(e)}")
 
 
 @app.route("/<thing>", methods=["GET", "POST"])
@@ -101,13 +112,16 @@ def things(thing):
     ip = str(request.remote_addr)
     tbl = getTable(thing)
     if request.method == "GET":
-        log(f"[INFO]: GET /{thing}\t{ip}")
+        log("[INFO]: GET /" + thing + "\t" + ip)
         todo, done = getList(tbl.all())
-        return render("things.html", thing=thing, todo=todo, done=done)
+        if "curl" in request.headers.get("User-Agent"):
+            return genCLIThing(thing)
+        else:
+            return render("things.html", thing=thing, todo=todo, done=done)
     elif request.method == "POST":
         doc = genDoc(request.form, tbl)
         postNewThing(doc, tbl, thing, ip)
-        return redirect(f"/#{thing}")
+        return redirect("/" + thing)
 
 
 @app.route("/update/<thing>", methods=["POST"])
@@ -119,14 +133,14 @@ def update(thing):
     new = int(form["new"])
     old = int(form["old"])
     name = form["name"]
+    date = form["date"] if form["date"] else datetime.now().strftime("%Y-%m-%d")
 
     try:
-        if new <= 0:
+        if old == new == 0:
+            db.update({"date": date}, where("name") == name)
+        elif new <= 0:
             db.update(decrement("position"), (where("position") > old))
-            db.update(
-                {"position": new, "date": datetime.now().strftime("%Y-%m-%d")},
-                where("name") == name,
-            )
+            db.update({"position": 0, "date": date}, where("name") == name)
         elif old > new:
             db.update(
                 increment("position"),

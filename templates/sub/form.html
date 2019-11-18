@@ -1,23 +1,26 @@
 <!-- New Form -->
 <div class="container">
 	<div class="row">
-		<div class="col-xs-12">
-			<form action="/{{ type }}" method="POST">
-				<div class="form-row">
-					<div class="form-group col-xs-3 col-sm-2">
-						<label for="position" name="position">Position</label>
-						<input class="form-control" type="number" id="position" name="position" min=0 step=1 placeholder="pos">
-					</div>
-					<div class="form-group col-xs-8 col-sm-9">
-						<label for="name" name="name">Name</label>
-						<input class="form-control" type="text" id="name" name="name" placeholder="Name">
-					</div>
-					<div class="form-group col-xs-1 col-sm-1">
-						<label for="submit" name="submit">&nbsp;</label>
-						<button type="submit" class="btn btn-primary">Submit</button>
-					</div>
+		<form action="/{{ type }}" method="POST">
+			<div class="form-row">
+				<div class="form-group col-xs-3 col-sm-2 col-md-1">
+					<label for="position" name="position">Position</label>
+					<input class="form-control" type="number" id="position" name="position" min=0 step=1 placeholder="pos">
 				</div>
-			</form>
-		</div>
+				<div class="form-group col-xs-9 col-sm-6 col-md-7">
+					<label for="name" name="name">Name</label>
+					<input class="form-control" type="text" id="name" name="name" placeholder="Name">
+				</div>
+				<div class="form-group col-xs-8 col-sm-2 col-md-2">
+					<label for="date" name="date">Date</label>
+					<input class="form-control" type="date" id="date" name="date">
+				</div>
+				<div class="form-group col-xs-4 col-sm-2 col-md-2">
+					<label for="submit" name="submit">Submit</label>
+					<button type="submit" class="btn btn-primary btn-block">Submit</button>
+				</div>
+			</div>
+		</form>
 	</div>
+	<br /><hr /><br />
 </div>
