@@ -18,10 +18,9 @@ if I ever decide that the drawbacks start to outweigh using something like SQLit
 
 ## Usage
 ```
-py ppfchecklist.py WORKDIR [LOGFILE] [STDOUT]
+py ppfchecklist.py WORKDIR [LOGFILE]
 ```
 `LOGFILE` defaults to `output.log` in `WORKDIR`.
-The third argument must be `stdout` to also print to stdout and the logfile. Can't print to stdout and no logfile.
 
 ### list.db
 TinyDB database where each entry has the comic `name`, `position`, and `date` completed in the `comics` table.

@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from json import load
 from os.path import join
@@ -19,24 +20,16 @@ with open(joint(BASE_DIR, "tables.json"), "r") as f:
     tbls = load(f)
 
 
-def log(message):
-    msg = f"{datetime.now().replace(microsecond=0).isoformat()}\t{message}\n"
-    with open(OUTPUT, "a") as fp:
-        fp.write(msg)
-    if STDOUT:
-        print(msg[:-1])
-
-
 def getTable(thing):
     if thing not in tbls:
-        log(f"[ERROR]\tAttempting to access table that does not exist: {thing}")
+        logging.error("Attempting to access table that does not exist: %s", thing)
         raise TableNotFoundError(f"'{thing}' is not a valid table name.")
     return db.table(thing)
 
 
 def getTableAll(thing):
     if thing not in tbls:
-        log(f"[ERROR]\tAttempting to access table that does not exist: {thing}")
+        logging.error("Attempting to access table that does not exist: %s", thing)
         raise TableNotFoundError(f"'{thing}' is not a valid table name.")
     return db.table(thing).all()
 
@@ -76,9 +69,8 @@ def favicon():
 
 @app.route("/", methods=["GET"])
 def index():
-    ip = str(request.remote_addr)
-
-    log(f"[INFO]: GET /\t{ip}")
+    ip = str(request.headers["X-Forwarded-For"])
+    logging.info("GET /\t%s", ip)
 
     things = []
 
@@ -101,23 +93,19 @@ def postNewThing(doc, db, uri, ip):
             if not doc["date"]:
                 doc["date"] = datetime.now().strftime("%Y-%m-%d")
             db.insert(doc)
-        log(f"[INFO]: POST /{uri}\t{ip} - {str(doc)}")
+        logging.info("POST /%s\t%s - %s", uri, ip, doc)
     except Exception as e:
-        log(f"[ERROR]: POST /{uri}\t{ip} - {str(doc)}")
-        log(f"              {str(e)}")
+        logging.exception("POST /%s\t%s - %s: %s", uri, ip, doc, e)
 
 
 @app.route("/<thing>", methods=["GET", "POST"])
 def things(thing):
-    ip = str(request.remote_addr)
+    ip = str(request.headers["X-Forwarded-For"])
     tbl = getTable(thing)
     if request.method == "GET":
-        log("[INFO]: GET /" + thing + "\t" + ip)
+        logging.info("GET /" + thing + "\t" + ip)
         todo, done = getList(tbl.all())
-        if "curl" in request.headers.get("User-Agent"):
-            return genCLIThing(thing)
-        else:
-            return render("things.html", thing=thing, todo=todo, done=done)
+        return render("things.html", thing=thing, todo=todo, done=done)
     elif request.method == "POST":
         doc = genDoc(request.form, tbl)
         postNewThing(doc, tbl, thing, ip)
@@ -126,7 +114,7 @@ def things(thing):
 
 @app.route("/update/<thing>", methods=["POST"])
 def update(thing):
-    ip = str(request.remote_addr)
+    ip = str(request.headers["X-Forwarded-For"])
     db = getTable(thing)
 
     form = request.form
@@ -155,16 +143,21 @@ def update(thing):
             db.update({"position": new}, where("name") == name)
 
         if old != new:
-            log(f"[INFO]: UPDATE\t{ip} - '{name}': {str(old)} -> {str(new)}")
+            logging.info("UPDATE\t%s - '%s': %s -> %s", ip, name, old, new)
     except Exception as e:
-        log(f"[ERROR]: UPDATE\t{ip} - '{name}': {str(old)} -> {str(new)}")
-        log(f"               \t{str(e)}")
+        logging.exception("UPDATE\t%s - '%s': %s -> %s; %s", ip, name, old, new, e)
 
     return redirect(f"/#{thing}") if request.args.get("idx") else redirect(f"/{thing}")
 
 
 if __name__ == "__main__":
     OUTPUT = argv[2] if (len(argv) >= 3) else join(BASE_DIR, "output.log")
-    STDOUT = (len(argv) >= 4) and (argv[3] == "stdout")
+
+    logging.basicConfig(
+        format="%(asctime)s\t[%(levelname)s]\t%(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        level=logging.INFO,
+        filename=OUTPUT,
+    )
 
     app.run(host="0.0.0.0", port=5432, debug=True)
