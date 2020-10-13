@@ -8,7 +8,7 @@
 {% endblock %}
 
 {% block body %}
-	{% with thing=thing, done=done, todo=todo %}
+	{% with thing=thing, done=done, todo=todo, autofocus=True %}
 		{% include "sub/thing.html" %}
 	{% endwith %}
 {% endblock %}

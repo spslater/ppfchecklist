@@ -46,12 +46,8 @@ def getList(all_items):
 def genDoc(form, db):
     maxPos = max([int(a["position"]) for a in db]) if len(db) else 0
 
-    pos = (
-        int(form["position"] if form["position"] else maxsize)
-        if (int(form["position"]) > 0)
-        else 0
-    )
-    position = pos if (pos <= maxPos) else maxPos + 1
+    pos = max(0, int(form["position"] if form["position"] != "" else maxsize))
+    position = pos if (pos <= maxPos) else (maxPos + 1)
     name = form["name"].strip()
     date = form["date"]
 
