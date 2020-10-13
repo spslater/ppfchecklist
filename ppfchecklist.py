@@ -49,7 +49,7 @@ def genDoc(form, db):
     pos = max(0, int(form["position"] if form["position"] != "" else maxsize))
     position = pos if (pos <= maxPos) else (maxPos + 1)
     name = form["name"].strip()
-    date = form["date"]
+    date = form["date"] if "date" in form else datetime.now().strftime("%Y-%m-%d")
 
     return {"position": position, "name": name, "date": date}
 
@@ -75,10 +75,10 @@ def index():
         todo, done = getList(tb_all)
         things.append({"thing": tb, "todo": todo, "done": done})
 
-    return render("index.html", things=things)
+    return render("index.html", things=things, tbls=tbls)
 
 
-def postNewThing(doc, db, uri, ip):
+def insertNewThing(doc, db, uri, ip):
     try:
         if doc["position"] > 0:
             db.update(increment("position"), where("position") >= doc["position"])
@@ -91,7 +91,7 @@ def postNewThing(doc, db, uri, ip):
             db.insert(doc)
         logging.info("POST /%s\t%s - %s", uri, ip, doc)
     except Exception as e:
-        logging.exception("POST /%s\t%s - %s: %s", uri, ip, doc, e)
+        logging.exception("POST /%s\t%s - %s; %s", uri, ip, doc, e)
 
 
 @app.route("/<thing>", methods=["GET", "POST"])
@@ -99,13 +99,13 @@ def things(thing):
     ip = str(request.headers["X-Forwarded-For"])
     tbl = getTable(thing)
     if request.method == "GET":
-        logging.info("GET /" + thing + "\t" + ip)
+        logging.info("GET /%s\t%s", thing, ip)
         todo, done = getList(tbl.all())
-        return render("things.html", thing=thing, todo=todo, done=done)
+        return render("things.html", thing=thing, todo=todo, done=done, tbls=tbls)
     elif request.method == "POST":
         doc = genDoc(request.form, tbl)
-        postNewThing(doc, tbl, thing, ip)
-        return redirect("/" + thing)
+        insertNewThing(doc, tbl, thing, ip)
+        return redirect(f"/{thing}")
 
 
 @app.route("/update/<thing>", methods=["POST"])
@@ -144,6 +144,33 @@ def update(thing):
         logging.exception("UPDATE\t%s - '%s': %s -> %s; %s", ip, name, old, new, e)
 
     return redirect(f"/#{thing}") if request.args.get("idx") else redirect(f"/{thing}")
+
+
+@app.route("/move/<thing>", methods=["POST"])
+def move(thing):
+    ip = str(request.remote_addr)
+    db = getTable(thing)
+
+    form = request.form
+    name = form["name"]
+    old = int(form["old"])
+    new = int(form["new"])
+    pos = 0 if (old == new == 0) else (int(maxsize) if old == new else new)
+    table = form["table"]
+    newTable = getTable(table)
+
+    if new != thing:
+        val = db.search((where("name") == name) & (where("position") == old))
+        for v in val:
+            v["position"] = pos
+            newVal = genDoc(v, newTable)
+            insertNewThing(newVal, newTable, f"move/{thing}", ip)
+        db.remove((where("name") == name) & (where("position") == old))
+        if pos != 0:
+            db.update(decrement("position"), (where("position") > old))
+
+        return redirect(f"/{table}")
+    return redirect(f"/{thing}")
 
 
 if __name__ == "__main__":

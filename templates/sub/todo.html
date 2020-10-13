@@ -3,29 +3,56 @@
 <div class="container" style="font-size:200%">
 	{% for t in todo %}
 	<div class="row">
-		<div class="col-xs-12">
-			<form action="/update/{{ type }}{% if idx %}?idx={{ idx }}{% endif %}" method="POST">
-				<div class="form-row">
-					<div class="form-group col-xs-3 col-sm-2 col-md-1">
-						{{ t.position }}
-						<input class="form-control" type="hidden" id="old" name="old" value="{{ t.position }}">
-					</div>
-					<div class="form-group col-xs-9 col-sm-10 col-md-7">
-						{{ t.name }}
-						<input class="form-control" type="hidden" id="name" name="name" value="{{ t.name }}">
-					</div>
-					<div class="form-group col-xs-6 col-sm-6 col-md-1">
-						<input class="form-control" type="number" id="new" name="new" placeholder="{{ t.position }}">
-					</div>
-					<div class="form-group col-xs-6 col-sm-4 col-md-1">
-						<input class="form-control" type="date" id="date" name="date">
-					</div>
-					<div class="form-group col-xs-6 col-sm-2 col-md-2">
-						<button type="submit" class="btn btn-primary btn-block">Update</button>
-					</div>
-				</div>
-			</form>
+		<div class="col-xs-1 col-sm-1">{{ t.position }}</div>
+		<div class="col-xs-11 col-sm-7">{{ t.name }}</div>
+		<div class="form-group col-xc-6 col-sm-2">
+			<button class="btn btn-primary btn-block" type="button" data-toggle="collapse" data-target="#update_{{ t.doc_id }}">
+				Update
+			</button>
 		</div>
+		<div class="form-group col-xc-6 col-sm-2">
+			<button class="btn btn-primary btn-block" type="button" data-toggle="collapse" data-target="#move_{{ t.doc_id }}">
+				Move
+			</button>
+		</div>
+	</div>
+	<div class="row collapse" id="update_{{ t.doc_id }}">
+		<form action="/update/{{ type }}{% if idx %}?idx={{ idx }}{% endif %}" method="POST">
+			<div class="form-row">
+				<input class="form-control" type="hidden" id="old" name="old" value="{{ t.position }}">
+				<input class="form-control" type="hidden" id="name" name="name" value="{{ t.name }}">
+				<div class="form-group col-xs-4 col-sm-6 col-md-2">
+					<input class="form-control" type="number" id="new" name="new" placeholder="{{ t.position }}">
+				</div>
+				<div class="form-group col-xs-5 col-sm-4 col-md-7">
+					<input class="form-control" type="date" id="date" name="date">
+				</div>
+				<div class="form-group col-xs-3 col-sm-2 col-md-3">
+					<button type="submit" class="btn btn-primary btn-block">Submit</button>
+				</div>
+			</div>
+		</form>
+	</div>
+	<div class="row collapse" id="move_{{ t.doc_id }}">
+		<form action="/move/{{ type }}" method="POST">
+			<div class="form-row">
+				<input class="form-control" type="hidden" id="name" name="name" value="{{ t.name }}">
+				<input class="form-control" type="hidden" id="old" name="old" value="{{ t.position }}">
+				<div class="form-group col-xs-3 col-sm-6 col-md-2">
+					<input class="form-control" type="number" id="new" name="new" placeholder="{{ t.position }}" value="{{ t.position }}">
+				</div>
+				<div class="from-group col-xc-3 col-sm-4 col-md-7">
+					<select class="form-control" id="table" name="table">
+						{% for table in tbls %}
+						<option value="{{ table }}" {% if table == type %}selected{% endif %}>{{ table }}</option>
+						{% endfor %}
+					</select>
+				</div>
+				<div class="form-group col-xs-6 col-sm-2 col-md-3">
+					<button type="submit" class="btn btn-primary btn-block">Submit</button>
+				</div>
+			</div>
+		</form>
 	</div>
 	<hr>
 	{% endfor %}

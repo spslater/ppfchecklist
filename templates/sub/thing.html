@@ -6,10 +6,10 @@
 	{% include "sub/form.html" %}
 {% endwith %}
 
-{% with todo=todo, type=thing, idx=idx %}
+{% with todo=todo, type=thing, idx=idx, tbls=tbls %}
 	{% include "sub/todo.html" %}
 {% endwith %}
 
-{% with done=done, type=thing %}
+{% with done=done, type=thing, tbls=tbls %}
 	{% include "sub/done.html" %}
 {% endwith %}

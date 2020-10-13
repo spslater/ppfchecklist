@@ -43,6 +43,10 @@ Only displays items for specific list named `thing`
 ### Position
 Can edit the position in the list.
 
+### Movement
+Can move items between 2 different lists. Useful if a new sublist is created
+like going from `tvshows` to `animated` and `live action`.
+
 ## Contributing
 Help is greatly appreciated. First check if there are any issues open that relate to what you want
 to help with. Also feel free to make a pull request with changes / fixes you make.
