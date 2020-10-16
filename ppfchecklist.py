@@ -1,8 +1,15 @@
 import logging
 from datetime import datetime
 from json import load
+from pprint import pformat
 from os.path import join
 from sys import argv, maxsize
+
+from flask import Flask, redirect
+from flask import render_template as render
+from flask import request, send_from_directory
+from tinydb import TinyDB, where
+from tinydb.operations import decrement, increment
 
 
 class TableNotFoundError(Exception):
@@ -13,11 +20,7 @@ class TableNotFoundError(Exception):
 BASE_DIR = argv[1]
 
 app = Flask(__name__, static_url_path="")
-Bootstrap(app)
 db = TinyDB(join(BASE_DIR, "list.db"))
-
-with open(joint(BASE_DIR, "tables.json"), "r") as f:
-    tbls = load(f)
 
 
 def getTable(thing):
@@ -148,7 +151,7 @@ def update(thing):
 
 @app.route("/move/<thing>", methods=["POST"])
 def move(thing):
-    ip = str(request.remote_addr)
+    ip = str(request.headers["X-Forwarded-For"])
     db = getTable(thing)
 
     form = request.form

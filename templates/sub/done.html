@@ -1,58 +1,21 @@
 <!-- Done List --> 
 {% if done|length > 0 %}
-<div class="container" style="font-size:150%">
+<div class="container-fluid" style="font-size:150%">
 	<h2>Completed</h2>
 	{% for d in done %}
 	<div class="row">
-		<div class="col-xs-6 col-sm-3">{{ d.date }}</div>
-		<div class="col-xs-6 col-sm-7">{{ d.name }}</div>
-		<div class="form-group col-xc-6 col-sm-1">
-			<button class="btn btn-primary btn-block" type="button" data-toggle="collapse" data-target="#update_{{ type }}_{{ d.doc_id }}">
-				Update
-			</button>
-		</div>
-		<div class="form-group col-xc-6 col-sm-1">
-			<button class="btn btn-primary btn-block" type="button" data-toggle="collapse" data-target="#move_{{ type }}_{{ d.doc_id }}">
-				Move
+		<div class="col-4 col-md-3 col-lg-2">{{ d.date }}</div>
+		<div class="col-6 col-md-7 col-lg-9">{{ d.name }}</div>
+		<div class="col-2 col-md-2 col-lg-1">
+			<button class="btn btn-primary btn-block" type="button" data-toggle="collapse" data-target=".{{ type }}_{{ d.doc_id }}">
+				Edit
 			</button>
 		</div>
 	</div>
-	<div class="row collapse" id="update_{{ type }}_{{ d.doc_id }}">
-		<form action="/update/{{ type }}{% if idx %}?idx={{ idx }}{% endif %}" method="POST">
-			<div class="form-row">
-				<input class="form-control" type="hidden" id="name" name="name" value="{{ d.name }}">
-				<input class="form-control" type="hidden" id="new"  name="new"  value="0">
-				<input class="form-control" type="hidden" id="old"  name="old"  value="0">
-				<div class="form-group col-xs-9">
-					<input class="form-control" type="date"   id="date" name="date" required>
-				</div>
-				<div class="form-group col-xs-3">
-					<button type="submit" class="btn btn-primary btn-block">Submit</button>
-				</div>
-			</div>
-		</form>
-	</div>
-	<div class="row collapse" id="move_{{ type }}_{{ d.doc_id }}">
-		<form action="/move/{{ type }}" method="POST">
-			<div class="form-row">
-				<input class="form-control" type="hidden" id="name" name="name" value="{{ d.name }}">
-				<input class="form-control" type="hidden" id="old" name="old" value="{{ d.position }}">
-				<div class="form-group col-xs-3 col-sm-6 col-md-2">
-					<input class="form-control" type="number" id="new" name="new" placeholder="{{ d.position }}" value="{{ d.position }}">
-				</div>
-				<div class="from-group col-xc-3 col-sm-4 col-md-7">
-					<select class="form-control" id="table" name="table">
-						{% for table in tbls %}
-						<option value="{{ table }}" {% if table == type %}selected{% endif %}>{{ table }}</option>
-						{% endfor %}
-					</select>
-				</div>
-				<div class="form-group col-xs-6 col-sm-2 col-md-3">
-					<button type="submit" class="btn btn-primary btn-block">Submit</button>
-				</div>
-			</div>
-		</form>
-	</div>
+	{% set collapse_class = type ~ '_' ~ d.doc_id %}
+	{% with collapse_class=collapse_class, type=type, idx=idx, position=d.position, name=d.name, tbls=tbls %}
+		{% include "sub/edit.html" %}
+	{% endwith %}
 	<br />
 	{% endfor %}
 	<hr />
