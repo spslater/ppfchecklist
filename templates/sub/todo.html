@@ -11,7 +11,7 @@
 			</button>
 		</div>
 	</div>
-	{% with collapse_class=t.doc_id, type=type, idx=idx, position=t.position, name=t.name, tbls=tbls %}
+	{% with collapse_class=t.doc_id, type=type, uid=t.doc_id, position=t.position, name=t.name, tbls=tbls %}
 		{% include "sub/edit.html" %}
 	{% endwith %}
 	<hr>
