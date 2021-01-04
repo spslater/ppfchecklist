@@ -1,6 +1,8 @@
 import logging
 from datetime import datetime
-from json import load
+from io import UnsupportedOperation
+from json import dumps, load
+from os import fsync
 from pprint import pformat
 from os.path import join
 from sys import argv, maxsize
@@ -8,8 +10,28 @@ from sys import argv, maxsize
 from flask import Flask, redirect
 from flask import render_template as render
 from flask import request, send_from_directory
-from tinydb import TinyDB, where
+from tinydb import JSONStorage, TinyDB, where
 from tinydb.operations import decrement, increment
+
+
+class PrettyJSONStorage(JSONStorage):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def write(self, data):
+        self._handle.seek(0)
+        serialized = dumps(data, indent=4, sort_keys=True, **self.kwargs)
+        try:
+            self._handle.write(serialized)
+        except UnsupportedOperation:
+            raise IOError(
+                f'Cannot write to the database. Access mode is "{self._mode}"'
+            )
+
+        self._handle.flush()
+        fsync(self._handle.fileno())
+
+        self._handle.truncate()
 
 
 class TableNotFoundError(Exception):
@@ -20,7 +42,7 @@ class TableNotFoundError(Exception):
 BASE_DIR = argv[1]
 
 app = Flask(__name__, static_url_path="")
-db = TinyDB(join(BASE_DIR, "list.db"))
+db = TinyDB(join(BASE_DIR, "list.db"), storage=PrettyJSONStorage)
 
 
 def getIp(request):
