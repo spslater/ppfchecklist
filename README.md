@@ -18,9 +18,20 @@ if I ever decide that the drawbacks start to outweigh using something like SQLit
 
 ## Usage
 ```
-py ppfchecklist.py WORKDIR [LOGFILE]
+usage: ppfchecklist.py [--help] [-b BASE] [-d DB] [-t TABLES] [--log LOGFILE] [--mode MODE] [--port PORT] [--debug]
+
+optional arguments:
+  --help                show this help message and exit
+  -b BASE, --basedir BASE
+                        Base directory that files are located (default: ./)
+  -d DB, --database DB  TinyDB file location (default: list.db)
+  -t TABLES, --tables TABLES
+                        JSON file with list of tables (default: tables.json)
+  --log LOGFILE         log file (default: None)
+  --mode MODE           logging level for output (default: INFO)
+  --port PORT           port the application will run on (default: 5000)
+  --debug               run application in debug mode, reloading on file changes (default: False)
 ```
-`LOGFILE` defaults to `output.log` in `WORKDIR`.
 
 ### list.db
 TinyDB database where each entry has the comic `name`, `position`, and `date` completed in the `comics` table.

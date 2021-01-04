@@ -1,11 +1,12 @@
 import logging
+from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from datetime import datetime
 from io import UnsupportedOperation
 from json import dumps, load
 from os import fsync
-from pprint import pformat
 from os.path import join
-from sys import argv, maxsize
+from pprint import pformat
+from sys import argv, maxsize, stdout
 
 from flask import Flask, redirect
 from flask import render_template as render
@@ -39,10 +40,7 @@ class TableNotFoundError(Exception):
         self.message = message
 
 
-BASE_DIR = argv[1]
-
 app = Flask(__name__, static_url_path="")
-db = TinyDB(join(BASE_DIR, "list.db"), storage=PrettyJSONStorage)
 
 
 def getIp(request):
@@ -246,13 +244,91 @@ def delete(thing):
 
 
 if __name__ == "__main__":
-    OUTPUT = argv[2] if (len(argv) >= 3) else join(BASE_DIR, "output.log")
+    parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter, add_help=False)
 
-    logging.basicConfig(
-        format="%(asctime)s\t[%(levelname)s]\t%(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        level=logging.INFO,
-        filename=OUTPUT,
+    parser.add_argument("--help", action="help", help="show this help message and exit")
+
+    parser.add_argument(
+        "-b",
+        "--basedir",
+        dest="base",
+        default="./",
+        help="Base directory that files are located",
+        metavar="BASE",
+    )
+    parser.add_argument(
+        "-d",
+        "--database",
+        dest="database",
+        default="list.db",
+        help="TinyDB file location",
+        metavar="DB",
+    )
+    parser.add_argument(
+        "-t",
+        "--tables",
+        dest="tables",
+        default="tables.json",
+        help="JSON file with list of tables",
+        metavar="TABLES",
     )
 
-    app.run(host="0.0.0.0", port=5432, debug=True)
+    parser.add_argument(
+        "--log",
+        dest="logfile",
+        default=None,
+        help="log file",
+        metavar="LOGFILE",
+    )
+    parser.add_argument(
+        "--mode",
+        dest="mode",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="logging level for output",
+        metavar="MODE",
+    )
+    parser.add_argument(
+        "--port",
+        dest="port",
+        type=int,
+        default=5000,
+        help="port the application will run on",
+        metavar="PORT",
+    )
+    parser.add_argument(
+        "--debug",
+        dest="debug",
+        default=False,
+        action="store_true",
+        help="run application in debug mode, reloading on file changes",
+    )
+
+    args = parser.parse_args()
+
+    port = args.port
+    debug = args.debug
+
+    database = join(args.base, args.database)
+    tables = join(args.base, args.tables)
+    output = args.logfile
+
+    db = TinyDB(database, storage=PrettyJSONStorage)
+
+    with open(tables, "r") as f:
+        tbls = load(f)
+
+    handler_list = (
+        [logging.StreamHandler(stdout), logging.FileHandler(output)]
+        if output
+        else [logging.StreamHandler(stdout)]
+    )
+
+    logging.basicConfig(
+        format="%(asctime)s\t[%(levelname)s]\t{%(module)s}\t%(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        level=logging.INFO,
+        handlers=handler_list,
+    )
+
+    app.run(host="0.0.0.0", port=port, debug=debug)
