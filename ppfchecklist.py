@@ -218,12 +218,29 @@ def move(thing):
         val = db.get(doc_id=uid)
         val["position"] = pos
         newVal = genDoc(val, newTable)
-        newUid = insertNewThing(newVal, newTable, f"move/{thing}", ip)
+        newUid = insertNewThing(newVal, newTable, "move/" + thing, ip)
         db.remove(doc_ids=[uid])
         if pos != 0:
             db.update(decrement("position"), (where("position") > old))
 
         logging.info("MOVE\t%s - %s %s -> %s %s", ip, thing, uid, table, newUid)
+
+    return redirect(f"/{thing}")
+
+
+@app.route("/delete/<thing>", methods=["POST"])
+def delete(thing):
+    ip = getIp(request)
+    db = getTable(thing)
+
+    form = request.form
+    uid = int(form["uid"])
+    name = form["name"].strip()
+    val = db.get(doc_id=uid)
+
+    if val["name"] == name:
+        db.remove(doc_ids=[uid])
+        log.info("DELETE\t%s - %s %s - %s", ip, thing, uid, name)
 
     return redirect(f"/{thing}")
 
