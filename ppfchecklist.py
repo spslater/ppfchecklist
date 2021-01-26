@@ -292,7 +292,7 @@ if __name__ == "__main__":
         "--port",
         dest="port",
         type=int,
-        default=5000,
+        default=80,
         help="port the application will run on",
         metavar="PORT",
     )

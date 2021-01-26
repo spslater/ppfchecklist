@@ -29,7 +29,7 @@ optional arguments:
                         JSON file with list of tables (default: tables.json)
   --log LOGFILE         log file (default: None)
   --mode MODE           logging level for output (default: INFO)
-  --port PORT           port the application will run on (default: 5000)
+  --port PORT           port the application will run on (default: 80)
   --debug               run application in debug mode, reloading on file changes (default: False)
 ```
 
@@ -63,6 +63,11 @@ like going from `tvshows` to `animated` and `live action`.
 
 ### Delete
 Can delete items from a list if no longer being tracked.
+
+## Docker
+`Dockerfile` to build the application and sample `docker-compose.yml.sample` are provided.
+Build with `docker` and then you can run the docker-compose file from that.
+The Docker image hasn't been uploaded publically yet.
 
 ## Contributing
 Help is greatly appreciated. First check if there are any issues open that relate to what you want
