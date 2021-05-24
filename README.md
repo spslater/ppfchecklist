@@ -18,7 +18,7 @@ if I ever decide that the drawbacks start to outweigh using something like SQLit
 
 ## Usage
 ```
-usage: ppfchecklist.py [--help] [-b BASE] [-d DB] [-t TABLES] [--log LOGFILE] [--mode MODE] [--port PORT] [--debug]
+usage: ppfchecklist.py [--help] [-b BASE] [-d DB] [-t TABLES] [-a] [-s JSON] [-e ENV] [--log LOGFILE] [--mode MODE] [--port PORT] [--debug]
 
 optional arguments:
   --help                show this help message and exit
@@ -27,6 +27,10 @@ optional arguments:
   -d DB, --database DB  TinyDB file location (default: list.db)
   -t TABLES, --tables TABLES
                         JSON file with list of tables (default: tables.json)
+  -a, --authorize       Validate users are authorized to access with sso login (default: False)
+  -s JSON, --sso JSON   SSO Client Secrets Json file (default: client_secrets.json)
+  -e ENV, --sso-env ENV
+                        Environment file to load with OIDC settings (default: .env)
   --log LOGFILE         log file (default: None)
   --mode MODE           logging level for output (default: INFO)
   --port PORT           port the application will run on (default: 80)
@@ -63,6 +67,16 @@ like going from `tvshows` to `animated` and `live action`.
 
 ### Delete
 Can delete items from a list if no longer being tracked.
+
+## Single-Sign-On Authentication
+SSO authentication can be enabled with the `-a` or `--authorize` flag.
+It defaults to using a file named `client_secrets.json`.
+When that is enabled, the `sso` json file with the client secretes must be preset.
+See `client_secrets.json.sample` for an example file structure.
+
+An environment file can be provided with the `-e` or `--sso-env` flag. It defaults to
+looking for a `.env` file. If that file can't be found, the program will work with the 
+values already set in the system environment.
 
 ## Docker
 `Dockerfile` to build the application and sample `docker-compose.yml.sample` are provided.
