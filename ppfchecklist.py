@@ -111,20 +111,34 @@ class DatabaseSqlite3(Database):
 
         self._connection.row_factory = sqlite3.Row
 
+    def import_json(self, filename: str):
+        with open(filename, "r") as fp:
+            data = load(fp)
+
+        for table, values in data.items():
+            if table == "_default":
+                continue
+
+            entries = [
+                (value.get("date"), value.get("position"), date.get("name"), table)
+                for val in values
+            ]
+            self._database.executemany("INSERT INTO list VALUES (?, ?, ?, ?)", entries)
+
     def _get_table(self, name: str):
         if name not in self._tables:
             logging.error("Attempting to access table that does not exist: %s", name)
             raise TableNotFoundError(f"'{name}' is not a valid table name.")
-        return self._database.execute("SELECT * FROM list WHERE table = ?", (name,))
 
     def info(self, table: str):
+        self._get_table(table)
         todo = self._database.execute(
             """
             SELECT * FROM list
             WHERE table = ? AND position > 0
             ORDER BY position ASC
             """,
-            (table,)
+            (table,),
         ).fetchall()
 
         done = self._database.execute(
@@ -151,13 +165,15 @@ class DatabaseTinyDB(Database):
         return self._database.table(name)
 
     def info(self, table: str):
-        if table not in tbls:
-            logging.error("Attempting to access table that does not exist: %s", table)
-            raise TableNotFoundError(f"'{table}' is not a valid table name.")
-        items = self._database.table(table).all()
-
-        todo = sorted([a for a in items if a["position"] > 0], key=lambda i: i["position"])
-        done = sorted([a for a in items if a["position"] == 0], key=lambda i: i["date"])
+        items = self._get_table(table).all()
+        todo = sorted(
+            [a for a in items if a["position"] > 0],
+            key=lambda i: i["position"],
+        )
+        done = sorted(
+            [a for a in items if a["position"] == 0],
+            key=lambda i: i["date"],
+        )
         return todo, done
 
 
@@ -278,172 +294,169 @@ def index():
     logging.info("GET /\t%s", get_ip(request))
 
     things_list = []
-    for tbl in tbls:
-        tb_all = get_table_all(tbl)
-        todo, done = get_list(tb_all)
-        things_list.append({"thing": tbl, "todo": todo, "done": done})
+    todo, done = database.info()
+    things_list.append({"thing": tbl, "todo": todo, "done": done})
 
     return render("index.html", things=things_list, tbls=tbls)
 
 
-def insert_new_thing(doc: dict, table: Table, uri: str, ipaddr: str) -> str:
-    """Insert a new document into given table
+# def insert_new_thing(doc: dict, table: Table, uri: str, ipaddr: str) -> str:
+#     """Insert a new document into given table
 
-    :param doc: Data for new thing
-    :type doc: dict
-    :param table: table to insert into
-    :type table: Table
-    :param uri: path request was made for, for logging purposes
-    :type uri: str
-    :param ipaddr: ip request came from, for logging purposes
-    :type ipaddr: str
-    :return: new unique id for the document
-    :rtype: str
-    """
-    uid = -1
-    try:
-        if doc["position"] > 0:
-            table.update(increment("position"), where("position") >= doc["position"])
-            doc.pop("date", None)
-            uid = table.insert(doc)
-        elif doc["position"] <= 0:
-            doc["position"] = 0
-            if not doc["date"]:
-                doc["date"] = datetime.now().strftime("%Y-%m-%d")
-            uid = table.insert(doc)
-        logging.info("POST /%s\t%s - %s", uri, ipaddr, doc)
-    # pylint: disable=broad-except
-    except Exception:
-        logging.exception("POST /%s\t%s - %s", uri, ipaddr, doc)
-    return uid
+#     :param doc: Data for new thing
+#     :type doc: dict
+#     :param table: table to insert into
+#     :type table: Table
+#     :param uri: path request was made for, for logging purposes
+#     :type uri: str
+#     :param ipaddr: ip request came from, for logging purposes
+#     :type ipaddr: str
+#     :return: new unique id for the document
+#     :rtype: str
+#     """
+#     uid = -1
+#     try:
+#         if doc["position"] > 0:
+#             table.update(increment("position"), where("position") >= doc["position"])
+#             doc.pop("date", None)
+#             uid = table.insert(doc)
+#         elif doc["position"] <= 0:
+#             doc["position"] = 0
+#             if not doc["date"]:
+#                 doc["date"] = datetime.now().strftime("%Y-%m-%d")
+#             uid = table.insert(doc)
+#         logging.info("POST /%s\t%s - %s", uri, ipaddr, doc)
+#     # pylint: disable=broad-except
+#     except Exception:
+#         logging.exception("POST /%s\t%s - %s", uri, ipaddr, doc)
+#     return uid
 
 
 @app.route("/<string:thing>", methods=["GET", "POST"])
 def things(thing: str):
     """View or create items for specific thing"""
     ipaddr = get_ip(request)
-    table = get_table(thing)
     if request.method == "GET":
         logging.info("GET /%s\t%s", thing, ipaddr)
-        todo, done = get_list(table.all())
+        todo, done = database.info(thing)
         return render("things.html", thing=thing, todo=todo, done=done, tbls=tbls)
-    # request.method == "POST"
-    doc = generate_document(request.form, table)
-    insert_new_thing(doc, table, thing, ipaddr)
+    # # request.method == "POST"
+    # doc = generate_document(request.form, table)
+    # insert_new_thing(doc, table, thing, ipaddr)
     return redirect(f"/{thing}")
 
 
-@app.route("/update/<string:thing>", methods=["POST"])
-def update(thing: str):
-    """Update item in list"""
-    ipaddr = get_ip(request)
-    table = get_table(thing)
+# @app.route("/update/<string:thing>", methods=["POST"])
+# def update(thing: str):
+#     """Update item in list"""
+#     ipaddr = get_ip(request)
+#     table = get_table(thing)
 
-    form = request.form
-    uid = int(form["uid"])
-    new = int(form["new"])
-    old = int(form["old"])
-    name = form["name"].strip()
-    date = form["date"] if form["date"] else datetime.now().strftime("%Y-%m-%d")
+#     form = request.form
+#     uid = int(form["uid"])
+#     new = int(form["new"])
+#     old = int(form["old"])
+#     name = form["name"].strip()
+#     date = form["date"] if form["date"] else datetime.now().strftime("%Y-%m-%d")
 
-    try:
-        if old == new == 0:
-            table.update({"date": date, "name": name}, doc_ids=[uid])
-            logging.info(
-                "UPDATE\t%s - %s %s\tChange Complete Date: %s",
-                ipaddr,
-                thing,
-                uid,
-                date,
-            )
-        elif old == new:
-            table.update({"name": name}, doc_ids=[uid])
-            logging.info("UPDATE\t%s - %s %s\tName Only: %s", ipaddr, thing, uid, name)
-        elif new <= 0:
-            table.update(decrement("position"), (where("position") > old))
-            table.update({"position": 0, "date": date, "name": name}, doc_ids=[uid])
-            logging.info(
-                "UPDATE\t%s - %s %s\tFirst Complete: %s", ipaddr, thing, uid, date
-            )
-        elif old > new:
-            table.update(
-                increment("position"),
-                (where("position") >= new) & (where("position") < old),
-            )
-            table.update({"position": new, "name": name}, doc_ids=[uid])
-            logging.info(
-                "UPDATE\t%s - %s %s\tMove Up In Rank\t%s -> %s",
-                ipaddr,
-                thing,
-                uid,
-                old,
-                new,
-            )
-        elif old < new:
-            table.update(
-                decrement("position"),
-                (where("position") <= new) & (where("position") > old),
-            )
-            table.update({"position": new, "name": name}, doc_ids=[uid])
-            logging.info(
-                "UPDATE\t%s - %s %s\tMove Down In Rank\t%s -> %s",
-                ipaddr,
-                thing,
-                uid,
-                old,
-                new,
-            )
-    # pylint: disable=broad-except
-    except Exception:
-        logging.exception("UPDATE\t%s - %s %s: %s", ipaddr, thing, uid, form)
+#     try:
+#         if old == new == 0:
+#             table.update({"date": date, "name": name}, doc_ids=[uid])
+#             logging.info(
+#                 "UPDATE\t%s - %s %s\tChange Complete Date: %s",
+#                 ipaddr,
+#                 thing,
+#                 uid,
+#                 date,
+#             )
+#         elif old == new:
+#             table.update({"name": name}, doc_ids=[uid])
+#             logging.info("UPDATE\t%s - %s %s\tName Only: %s", ipaddr, thing, uid, name)
+#         elif new <= 0:
+#             table.update(decrement("position"), (where("position") > old))
+#             table.update({"position": 0, "date": date, "name": name}, doc_ids=[uid])
+#             logging.info(
+#                 "UPDATE\t%s - %s %s\tFirst Complete: %s", ipaddr, thing, uid, date
+#             )
+#         elif old > new:
+#             table.update(
+#                 increment("position"),
+#                 (where("position") >= new) & (where("position") < old),
+#             )
+#             table.update({"position": new, "name": name}, doc_ids=[uid])
+#             logging.info(
+#                 "UPDATE\t%s - %s %s\tMove Up In Rank\t%s -> %s",
+#                 ipaddr,
+#                 thing,
+#                 uid,
+#                 old,
+#                 new,
+#             )
+#         elif old < new:
+#             table.update(
+#                 decrement("position"),
+#                 (where("position") <= new) & (where("position") > old),
+#             )
+#             table.update({"position": new, "name": name}, doc_ids=[uid])
+#             logging.info(
+#                 "UPDATE\t%s - %s %s\tMove Down In Rank\t%s -> %s",
+#                 ipaddr,
+#                 thing,
+#                 uid,
+#                 old,
+#                 new,
+#             )
+#     # pylint: disable=broad-except
+#     except Exception:
+#         logging.exception("UPDATE\t%s - %s %s: %s", ipaddr, thing, uid, form)
 
-    return redirect(f"/{thing}")
-
-
-@app.route("/move/<string:thing>", methods=["POST"])
-def move(thing: str):
-    """Move item from one list to another"""
-    ipaddr = get_ip(request)
-    table = get_table(thing)
-
-    form = request.form
-    uid = int(form["uid"])
-    old = int(form["old"])
-    new = int(form["new"])
-    pos = 0 if (old == new == 0) else (int(maxsize) if old == new else new)
-    table = form["table"]
-    new_table = get_table(table)
-    new_uid = -1
-
-    if new_table != thing:
-        val = table.get(doc_id=uid)
-        val["position"] = pos
-        new_val = generate_document(val, new_table)
-        new_uid = insert_new_thing(new_val, new_table, f"move/{thing}", ipaddr)
-        table.remove(doc_ids=[uid])
-        if pos != 0:
-            table.update(decrement("position"), (where("position") > old))
-        logging.info("MOVE\t%s - %s %s -> %s %s", ipaddr, thing, uid, table, new_uid)
-
-    return redirect(f"/{thing}")
+#     return redirect(f"/{thing}")
 
 
-@app.route("/delete/<string:thing>", methods=["POST"])
-def delete(thing: str):
-    """Remove item from table"""
-    ipaddr = get_ip(request)
-    table = get_table(thing)
+# @app.route("/move/<string:thing>", methods=["POST"])
+# def move(thing: str):
+#     """Move item from one list to another"""
+#     ipaddr = get_ip(request)
+#     table = get_table(thing)
 
-    form = request.form
-    uid = int(form["uid"])
-    name = form["name"].strip()
-    val = table.get(doc_id=uid)
+#     form = request.form
+#     uid = int(form["uid"])
+#     old = int(form["old"])
+#     new = int(form["new"])
+#     pos = 0 if (old == new == 0) else (int(maxsize) if old == new else new)
+#     table = form["table"]
+#     new_table = get_table(table)
+#     new_uid = -1
 
-    if val["name"] == name:
-        table.remove(doc_ids=[uid])
-        logging.info("DELETE\t%s - %s %s - %s", ipaddr, thing, uid, name)
+#     if new_table != thing:
+#         val = table.get(doc_id=uid)
+#         val["position"] = pos
+#         new_val = generate_document(val, new_table)
+#         new_uid = insert_new_thing(new_val, new_table, f"move/{thing}", ipaddr)
+#         table.remove(doc_ids=[uid])
+#         if pos != 0:
+#             table.update(decrement("position"), (where("position") > old))
+#         logging.info("MOVE\t%s - %s %s -> %s %s", ipaddr, thing, uid, table, new_uid)
 
-    return redirect(f"/{thing}")
+#     return redirect(f"/{thing}")
+
+
+# @app.route("/delete/<string:thing>", methods=["POST"])
+# def delete(thing: str):
+#     """Remove item from table"""
+#     ipaddr = get_ip(request)
+#     table = get_table(thing)
+
+#     form = request.form
+#     uid = int(form["uid"])
+#     name = form["name"].strip()
+#     val = table.get(doc_id=uid)
+
+#     if val["name"] == name:
+#         table.remove(doc_ids=[uid])
+#         logging.info("DELETE\t%s - %s %s - %s", ipaddr, thing, uid, name)
+
+#     return redirect(f"/{thing}")
 
 
 if __name__ == "__main__":
