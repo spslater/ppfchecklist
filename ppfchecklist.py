@@ -2,6 +2,7 @@
 
 import logging
 import sqlite3
+from abc import ABC, abstractmethod
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from datetime import datetime
 from io import UnsupportedOperation
@@ -52,70 +53,79 @@ class TableNotFoundError(Exception):
         super().__init__(message)
         self.message = message
 
-class DatabaseBoth:
-    """Database manager for the list information"""
 
+class Database:
     def __init__(
         self,
         basedir: str = None,
         filename: str = None,
         tables: str = None,
-        interface: str = None,
     ):
-        basedir = basedir or getenv("PPF_BASEDIR", ".")
-        self.interface = interface
+        self._basedir = basedir or getenv("PPF_BASEDIR", ".")
 
-        if interface == "tinydb":
-            self._init_tinydb(basedir, filename)
-        elif interface == "sqlite3":
-            self._init_sqlite3(basedir, filename)
-        else:
-            raise ValueError(
-                f"Interface must be of type `sqlite3` or `tinydb`, not `{interface}`"
-            )
+        filename = filename or getenv("PPF_DATABASE", "list.db")
+        self._filename = join(self._basedir, filename)
 
         tables = tables or getenv("PPF_TABLES", "tables.json")
-        tables_file = join(basedir, tables)
-
+        self._tables_file = join(self._basedir, tables)
         with open(tables_file, "r") as fp:
             self._tables = load(fp)
 
-    def get_table(self, name: str):
-        raise NotImplementedError(f'No `get_table` for interface "{self.interface}"')
+    def _get_table(self, name: str):
+        raise NotImplementedError
 
-    def _get_table_tinydb(self, name: str):
-        if name not in self._tables:
-            logging.error("Attempting to access table that does not exist: %s", name)
-            raise TableNotFoundError(f"'{name}' is not a valid table name.")
-        return self._database.table(name)
+    def info(self, table: str):
+        raise NotImplementedError
 
-    def _init_tinydb(self, basedir: str = None, filename: str = None):
-        database_file = filename or getenv("PPF_DATABASE", "list.db")
-        self._database = TinyDB(join(basedir, database_file), storage=PrettyJSONStorage)
+    def insert(self, form: dict):
+        raise NotImplementedError
 
-        self.get_table = self._get_table_tinydb
+    def update(self, form: dict):
+        raise NotImplementedError
 
-    def _get_tablle_sqlite3(self, name: str):
+    def move(self, form: dict):
+        raise NotImplementedError
+
+    def delete(self, form: dict):
+        raise NotImplementedError
+
+
+class DatabaseSqlite3(Database):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self._connection = sqlite3.connect(self._filename)
+        self._database = self._connection.cursor()
+
+        try:
+            self._database.execute(
+                """CREATE TABLE list
+                (date TEXT, position INTEGER, name TEXT, table TEXT)"""
+            )
+        except sqlite3.ProgrammingError:
+            pass
+        except sqlite3.DatabaseError as e:
+            logging.exception("Database provided is not an sqlite3 database")
+            self._connection.close()
+            raise e
+
+    def _get_table(self, name: str):
         if name not in self._tables:
             logging.error("Attempting to access table that does not exist: %s", name)
             raise TableNotFoundError(f"'{name}' is not a valid table name.")
         return self._database.execute("SELECT * FROM list WHERE table = ?", (name,))
 
 
-    def _init_sqlite3(self, basedir: str = None, filename: str = None):
-        database_file = filename or getenv("PPF_DATABASE", "list.db")
-        self._connection = sqlite3.connect(join(basedir, database_file))
-        self._database = self._connection.cursor()
+class DatabaseTinyDB(Database):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._database = TinyDB(self._filename, storage=PrettyJSONStorage)
 
-        try:
-            self._database.execute("""CREATE TABLE list
-                (date TEXT, position INTEGER, name TEXT, table TEXT)""")
-        except sqlite3.ProgrammingError:
-            pass
-        except sqlite3.DatabaseError:
-            logging.exception("Database provided is not an sqlite3 database")
-
-        self.get_table = self._get_tablle_sqlite3
+    def _get_table(self, name: str):
+        if name not in self._tables:
+            logging.error("Attempting to access table that does not exist: %s", name)
+            raise TableNotFoundError(f"'{name}' is not a valid table name.")
+        return self._database.table(name)
 
 
 app = Flask(__name__, static_url_path="")
