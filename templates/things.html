@@ -5,6 +5,7 @@
 {% endblock %}
 
 {% block body %}
+	<div style="float:right"><a href="/">Home</a></div>
 	{% with thing=thing, done=done, todo=todo, tbls=tbls, autofocus=True %}
 		{% include "sub/thing.html" %}
 	{% endwith %}
