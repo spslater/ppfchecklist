@@ -109,11 +109,34 @@ class DatabaseSqlite3(Database):
             self._connection.close()
             raise e
 
+        self._connection.row_factory = sqlite3.Row
+
     def _get_table(self, name: str):
         if name not in self._tables:
             logging.error("Attempting to access table that does not exist: %s", name)
             raise TableNotFoundError(f"'{name}' is not a valid table name.")
         return self._database.execute("SELECT * FROM list WHERE table = ?", (name,))
+
+    def info(self, table: str):
+        todo = self._database.execute(
+            """
+            SELECT * FROM list
+            WHERE table = ? AND position > 0
+            ORDER BY position ASC
+            """,
+            (table,)
+        ).fetchall()
+
+        done = self._database.execute(
+            """
+            SELECT * FROM list
+            WHERE table = ? AND position = 0
+            ORDER BY date ASC
+            """,
+            (table,),
+        ).fetchall()
+
+        return todo, done
 
 
 class DatabaseTinyDB(Database):
@@ -126,6 +149,16 @@ class DatabaseTinyDB(Database):
             logging.error("Attempting to access table that does not exist: %s", name)
             raise TableNotFoundError(f"'{name}' is not a valid table name.")
         return self._database.table(name)
+
+    def info(self, table: str):
+        if table not in tbls:
+            logging.error("Attempting to access table that does not exist: %s", table)
+            raise TableNotFoundError(f"'{table}' is not a valid table name.")
+        items = self._database.table(table).all()
+
+        todo = sorted([a for a in items if a["position"] > 0], key=lambda i: i["position"])
+        done = sorted([a for a in items if a["position"] == 0], key=lambda i: i["date"])
+        return todo, done
 
 
 app = Flask(__name__, static_url_path="")
