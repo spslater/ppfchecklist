@@ -9,4 +9,7 @@ services:
     ports:
       - 5000:80
     volumes:
-      - .:/usr/src/app
+      - ./.env.sample:/usr/src/app/.env
+      - ./client_secrets.json.sample:/usr/src/app/client_secrets.json
+      - ./list.db.sample:/usr/src/app/list.db
+      - ./tables.json.sample:/usr/src/app/tables.json

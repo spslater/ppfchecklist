@@ -5,10 +5,11 @@ from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from datetime import datetime
 from io import UnsupportedOperation
 from json import dumps, load
-from os import fsync
+from os import fsync, getenv
 from os.path import join
 from sys import maxsize, stdout
 
+from dotenv import load_dotenv
 from flask import Flask, redirect
 from flask import render_template as render
 from flask import request, send_from_directory
@@ -52,6 +53,24 @@ class TableNotFoundError(Exception):
 
 
 app = Flask(__name__, static_url_path="")
+
+
+def getenv_bool(key, default=None):
+    value = getenv(key)
+    if value is None:
+        if isinstance(default, bool):
+            return default
+        raise TypeError("Default value is not a `bool`")
+    return value.lower() in ("true", "t", "1", "yes", "y")
+
+
+def getenv_int(key, default=None):
+    value = getenv(key)
+    if value is None:
+        if isinstance(default, int):
+            return default
+        raise TypeError("Default value is not an `int`")
+    return int(value)
 
 
 def get_ip(req: request) -> str:
@@ -319,98 +338,43 @@ def delete(thing: str):
 
 
 if __name__ == "__main__":
-    parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter, add_help=False)
+    parser = ArgumentParser(
+        formatter_class=ArgumentDefaultsHelpFormatter,
+        add_help=False,
+    )
 
     parser.add_argument("--help", action="help", help="show this help message and exit")
 
     parser.add_argument(
-        "-b",
-        "--basedir",
-        dest="base",
-        default="./",
-        help="Base directory that files are located",
-        metavar="BASE",
-    )
-    parser.add_argument(
-        "-d",
-        "--database",
-        dest="database",
-        default="list.db",
-        help="TinyDB file location",
-        metavar="DB",
-    )
-    parser.add_argument(
-        "-t",
-        "--tables",
-        dest="tables",
-        default="tables.json",
-        help="JSON file with list of tables",
-        metavar="TABLES",
-    )
-    parser.add_argument(
-        "-a",
-        "--authorize",
-        dest="authorize",
-        default=False,
-        action="store_true",
-        help="Validate users are authorized to access with sso login"
-    )
-    parser.add_argument(
-        "-s",
-        "--sso",
-        dest="sso",
-        default="client_secrets.json",
-        help="SSO Client Secrets Json file",
-        metavar="JSON",
-    )
-    parser.add_argument(
         "-e",
-        "--sso-env",
+        "--env",
         dest="env",
         default=".env",
-        help="Environment file to load with OIDC settings",
+        help="File to load with environment settings",
         metavar="ENV",
-    )
-
-    parser.add_argument(
-        "--log",
-        dest="logfile",
-        default=None,
-        help="log file",
-        metavar="LOGFILE",
-    )
-    parser.add_argument(
-        "--mode",
-        dest="mode",
-        default="INFO",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-        help="logging level for output",
-        metavar="MODE",
-    )
-    parser.add_argument(
-        "--port",
-        dest="port",
-        type=int,
-        default=80,
-        help="port the application will run on",
-        metavar="PORT",
-    )
-    parser.add_argument(
-        "--debug",
-        dest="debug",
-        default=False,
-        action="store_true",
-        help="run application in debug mode, reloading on file changes",
     )
 
     args = parser.parse_args()
 
-    port = args.port
-    debug = args.debug
+    try:
+        load_dotenv(args.env, override=True)
+    except IOError:
+        logging.debug("No dotenv file found.")
 
-    database = join(args.base, args.database)
-    tables = join(args.base, args.tables)
-    output = args.logfile
+    port = getenv_int("PPF_PORT", 80)
+    debug = getenv_bool("PPF_DEBUG", False)
+
+    basedir = getenv("PPF_BASEDIR", ".")
+
+    database_file = getenv("PPF_DATABASE", "list.db")
+    database = join(basedir, database_file)
+
+    tables_file = getenv("PPF_TABLES", "tables.json")
+    tables = join(basedir, tables_file)
+
+    output_file = getenv("PPF_LOGFILE", None)
+    if output_file and output_file[0] != "/":
+        output_file = join(basedir, output_file)
 
     db = TinyDB(database, storage=PrettyJSONStorage)
 
@@ -418,34 +382,37 @@ if __name__ == "__main__":
         tbls = load(f)
 
     handler_list = (
-        [logging.StreamHandler(stdout), logging.FileHandler(output)]
-        if output
+        [logging.StreamHandler(stdout), logging.FileHandler(output_file)]
+        if output_file
         else [logging.StreamHandler(stdout)]
     )
+
+    loglevel = {
+        "CRITICAL": logging.CRITICAL,
+        "ERROR": logging.ERROR,
+        "WARNING": logging.WARNING,
+        "INFO": logging.INFO,
+        "DEBUG": logging.DEBUG,
+        "NOTSET": logging.NOTSET,
+    }[getenv("PPF_LOGLEVEL", "INFO")]
 
     logging.basicConfig(
         format="%(asctime)s\t[%(levelname)s]\t{%(module)s}\t%(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
-        level=logging.DEBUG if args.debug else logging.INFO,
+        level=loglevel,
         handlers=handler_list,
     )
 
-    if args.authorize:
+    if getenv_bool("PPF_AUTHORIZE", False):
         logging.debug("Setting up authorizing via OpenID Connect")
-        from os import getenv
-        from dotenv import load_dotenv
         from flask_oidc import OpenIDConnect
 
-        try:
-            load_dotenv(args.env, override=True)
-        except IOError:
-            logging.warning("No dotenv file found.")
         app.config.update(
             {
                 "SECRET_KEY": getenv("SECRET_KEY", "SUPERSECRETKEYTELLNOONE"),
-                "TESTING": args.debug,
-                "DEBUG": args.debug,
-                "OIDC_CLIENT_SECRETS": args.sso,
+                "TESTING": debug,
+                "DEBUG": debug,
+                "OIDC_CLIENT_SECRETS": getenv("OIDC_CLIENT_SECRETS"),
                 "OIDC_ID_TOKEN_COOKIE_SECURE": True,
                 "OIDC_REQUIRE_VERIFIED_EMAIL": False,
                 "OIDC_USER_INFO_ENABLED": True,
