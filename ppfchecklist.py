@@ -12,9 +12,7 @@ from os.path import join
 from sys import maxsize, stdout
 
 from dotenv import load_dotenv
-from flask import Flask, redirect
-from flask import render_template as render
-from flask import request, send_from_directory
+from flask import Flask, g, redirect, render_template, request, send_from_directory
 from tinydb import JSONStorage, TinyDB, where
 from tinydb.operations import decrement, increment
 from tinydb.table import Document, Table
@@ -68,7 +66,7 @@ class Database:
 
         tables = tables or getenv("PPF_TABLES", "tables.json")
         self._tables_file = join(self._basedir, tables)
-        with open(tables_file, "r") as fp:
+        with open(self._tables_file, "r") as fp:
             self._tables = load(fp)
 
     def _get_table(self, name: str):
@@ -91,25 +89,45 @@ class Database:
 
 
 class DatabaseSqlite3(Database):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-        self._connection = sqlite3.connect(self._filename)
-        self._database = self._connection.cursor()
+        # self._connection = self._get_connection()
+        # self._connection.row_factory = sqlite3.Row
+        # self._database = self._connection.cursor()
 
         try:
-            self._database.execute(
-                """CREATE TABLE list
-                (date TEXT, position INTEGER, name TEXT, table TEXT)"""
+            self._execute(
+                """CREATE TABLE ppfchecklist
+                (date TEXT, position INTEGER, name TEXT, checklist TEXT)"""
             )
-        except sqlite3.ProgrammingError:
-            pass
+        except sqlite3.OperationalError as e:
+            logging.debug(e)
         except sqlite3.DatabaseError as e:
             logging.exception("Database provided is not an sqlite3 database")
             self._connection.close()
             raise e
 
-        self._connection.row_factory = sqlite3.Row
+    def _connection(self):
+        db = getattr(g, "_sqlite3_database", None)
+        if db is None:
+            db = g._sqlite3_database = sqlite3.connect(self._filename)
+            db.row_factory = sqlite3.Row
+        return db
+
+    def _execute(self, sql: str, parameters: tuple = None):
+        db = self._connection()
+        cur = db.cursor()
+        result = cur.execute(sql, parameters) if parameters else cur.execute(sql)
+        db.commit()
+        return result
+
+    def _executemany(self, sql: str, parameters: tuple = None):
+        db = self._connection()
+        cur = db.cursor()
+        result = cur.executemany(sql, parameters) if parameters else cur.executemany(sql)
+        db.commit()
+        return result
 
     def import_json(self, filename: str):
         with open(filename, "r") as fp:
@@ -120,10 +138,10 @@ class DatabaseSqlite3(Database):
                 continue
 
             entries = [
-                (value.get("date"), value.get("position"), date.get("name"), table)
-                for val in values
+                (val.get("date"), val.get("position"), val.get("name"), table)
+                for val in values.values()
             ]
-            self._database.executemany("INSERT INTO list VALUES (?, ?, ?, ?)", entries)
+            self._executemany("INSERT INTO ppfchecklist VALUES (?, ?, ?, ?)", entries)
 
     def _get_table(self, name: str):
         if name not in self._tables:
@@ -132,19 +150,19 @@ class DatabaseSqlite3(Database):
 
     def info(self, table: str):
         self._get_table(table)
-        todo = self._database.execute(
+        todo = self._execute(
             """
-            SELECT * FROM list
-            WHERE table = ? AND position > 0
+            SELECT * FROM ppfchecklist
+            WHERE checklist = ? AND position > 0
             ORDER BY position ASC
             """,
             (table,),
         ).fetchall()
 
-        done = self._database.execute(
+        done = self._execute(
             """
-            SELECT * FROM list
-            WHERE table = ? AND position = 0
+            SELECT * FROM ppfchecklist
+            WHERE checklist = ? AND position = 0
             ORDER BY date ASC
             """,
             (table,),
@@ -154,8 +172,8 @@ class DatabaseSqlite3(Database):
 
 
 class DatabaseTinyDB(Database):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self._database = TinyDB(self._filename, storage=PrettyJSONStorage)
 
     def _get_table(self, name: str):
@@ -294,10 +312,11 @@ def index():
     logging.info("GET /\t%s", get_ip(request))
 
     things_list = []
-    todo, done = database.info()
-    things_list.append({"thing": tbl, "todo": todo, "done": done})
+    for tbl in db._tables:
+        todo, done = db.info(tbl)
+        things_list.append({"thing": tbl, "todo": todo, "done": done})
 
-    return render("index.html", things=things_list, tbls=tbls)
+    return render_template("index.html", things=things_list, tbls=db._tables)
 
 
 # def insert_new_thing(doc: dict, table: Table, uri: str, ipaddr: str) -> str:
@@ -338,8 +357,10 @@ def things(thing: str):
     ipaddr = get_ip(request)
     if request.method == "GET":
         logging.info("GET /%s\t%s", thing, ipaddr)
-        todo, done = database.info(thing)
-        return render("things.html", thing=thing, todo=todo, done=done, tbls=tbls)
+        todo, done = db.info(thing)
+        return render_template(
+            "things.html", thing=thing, todo=todo, done=done, tbls=db._tables
+        )
     # # request.method == "POST"
     # doc = generate_document(request.form, table)
     # insert_new_thing(doc, table, thing, ipaddr)
@@ -488,20 +509,21 @@ if __name__ == "__main__":
 
     basedir = getenv("PPF_BASEDIR", ".")
 
-    database_file = getenv("PPF_DATABASE", "list.db")
-    database = join(basedir, database_file)
-
-    tables_file = getenv("PPF_TABLES", "tables.json")
-    tables = join(basedir, tables_file)
-
     output_file = getenv("PPF_LOGFILE", None)
     if output_file and output_file[0] != "/":
         output_file = join(basedir, output_file)
 
-    db = TinyDB(database, storage=PrettyJSONStorage)
-
-    with open(tables, "r") as f:
-        tbls = load(f)
+    instance_type = getenv("PPF_DATABASE_TYPE", "tinydb")
+    if instance_type == "sqlite3":
+        db = DatabaseSqlite3(basedir)
+        db.import_json("tinydb.db")
+    elif instance_type == "tinydb":
+        db = DatabaseTinyDB(basedir)
+    else:
+        raise ValueError(
+            "Database type is invalid,"
+            f'must be either "sqlite3" or "tinydb" not "{instance_type}"'
+        )
 
     handler_list = (
         [logging.StreamHandler(stdout), logging.FileHandler(output_file)]
