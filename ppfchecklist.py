@@ -120,7 +120,9 @@ def get_table_all(thing: str) -> list[Document]:
     return db.table(thing).all()
 
 
-def get_list(items: list[Document]) -> tuple[list[Document], list[Document], list[Document]]:
+def get_list(
+    items: list[Document],
+) -> tuple[list[Document], list[Document], list[Document]]:
     """Separate the todo and done lists from a list of Documents
 
     :param items: list of Documents to split
@@ -218,7 +220,14 @@ def things(thing: str):
     if request.method == "GET":
         logging.info("GET /%s\t%s", thing, ipaddr)
         todo, done, drop = get_list(table.all())
-        return render("things.html", thing=thing, todo=todo, done=done, drop=drop, tbls=tbls)
+        return render(
+            "things.html",
+            thing=thing,
+            todo=todo,
+            done=done,
+            drop=drop,
+            tbls=tbls,
+        )
     doc = generate_document(request.form, table)
     insert_new_thing(doc, table, thing, ipaddr)
     return redirect(f"/{thing}")
