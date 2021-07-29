@@ -50,28 +50,31 @@
             "position": 3
         },
         "4": {
+            "date": "2021-07-13",
             "name": "Spider-Verse",
-            "position": 7
+            "position": 0
         },
         "5": {
+            "date": "2021-06-29",
             "name": "Batgirl: Stephanie Brown Vol 2",
-            "position": 4
+            "position": -1
         },
         "6": {
             "name": "Spider-Man Life Story",
-            "position": 5
+            "position": 4
         },
         "7": {
             "name": "Teen Titans: The Silver Age Vol 1",
-            "position": 8
+            "position": 6
         },
         "8": {
+            "date": "2021-07-13",
             "name": "Kingdom Come",
-            "position": 9
+            "position": -1
         },
         "9": {
             "name": "Fables Vol 22",
-            "position": 6
+            "position": 5
         }
     },
     "movies": {

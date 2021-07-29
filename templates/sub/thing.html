@@ -10,6 +10,10 @@
 	{% include "sub/todo.html" %}
 {% endwith %}
 
-{% with done=done, type=thing, tbls=tbls %}
-	{% include "sub/done.html" %}
+{% with items=done, title="Completed", type=thing, tbls=tbls %}
+	{% include "sub/list.html" %}
+{% endwith %}
+
+{% with items=drop, title="Dropped", type=thing, tbls=tbls %}
+	{% include "sub/list.html" %}
 {% endwith %}

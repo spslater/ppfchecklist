@@ -50,7 +50,8 @@ Only displays items for specific list named `thing`
 
 ## Editing
 ### Position
-Can edit the position in the list.
+Can edit the position in the list. A postition of `0` indicates the item is completed.
+A position of `-1` indicates it's been dropped.
 
 ### Names
 Can edit the title / name of an entry.
