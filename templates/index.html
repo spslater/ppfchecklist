@@ -7,7 +7,7 @@
 {% block body %}
 	{% for t in things %}
 	<div>
-		{% with thing=t.thing, done=t.done, todo=t.todo, tbls=tbls, autofocus=False %}
+		{% with thing=t.thing, done=t.done, todo=t.todo, drop=t.drop, tbls=tbls, autofocus=False %}
 			{% include "sub/thing.html" %}
 		{% endwith %}
 	</div>

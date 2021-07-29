@@ -120,17 +120,18 @@ def get_table_all(thing: str) -> list[Document]:
     return db.table(thing).all()
 
 
-def get_list(items: list[Document]) -> tuple[list[Document], list[Document]]:
+def get_list(items: list[Document]) -> tuple[list[Document], list[Document], list[Document]]:
     """Separate the todo and done lists from a list of Documents
 
     :param items: list of Documents to split
     :type items: list[Document]
     :return: the todo and done items from given list of Documents
-    :rtype: tuple[list[Document], list[Document]]
+    :rtype: tuple[list[Document], list[Document], list[Document]]
     """
     todo = sorted([a for a in items if a["position"] > 0], key=lambda i: i["position"])
     done = sorted([a for a in items if a["position"] == 0], key=lambda i: i["date"])
-    return todo, done
+    drop = sorted([a for a in items if a["position"] == -1], key=lambda i: i["date"])
+    return todo, done, drop
 
 
 @app.route("/favicon.ico")
@@ -171,8 +172,8 @@ def index():
     things_list = []
     for tbl in tbls:
         tb_all = get_table_all(tbl)
-        todo, done = get_list(tb_all)
-        things_list.append({"thing": tbl, "todo": todo, "done": done})
+        todo, done, drop = get_list(tb_all)
+        things_list.append({"thing": tbl, "todo": todo, "done": done, "drop": drop})
 
     return render("index.html", things=things_list, tbls=tbls)
 
@@ -216,9 +217,8 @@ def things(thing: str):
     table = get_table(thing)
     if request.method == "GET":
         logging.info("GET /%s\t%s", thing, ipaddr)
-        todo, done = get_list(table.all())
-        return render("things.html", thing=thing, todo=todo, done=done, tbls=tbls)
-    # request.method == "POST"
+        todo, done, drop = get_list(table.all())
+        return render("things.html", thing=thing, todo=todo, done=done, drop=drop, tbls=tbls)
     doc = generate_document(request.form, table)
     insert_new_thing(doc, table, thing, ipaddr)
     return redirect(f"/{thing}")
@@ -250,12 +250,16 @@ def update(thing: str):
         elif old == new:
             table.update({"name": name}, doc_ids=[uid])
             logging.info("UPDATE\t%s - %s %s\tName Only: %s", ipaddr, thing, uid, name)
-        elif new <= 0:
+        elif new == 0:
             table.update(decrement("position"), (where("position") > old))
             table.update({"position": 0, "date": date, "name": name}, doc_ids=[uid])
             logging.info(
                 "UPDATE\t%s - %s %s\tFirst Complete: %s", ipaddr, thing, uid, date
             )
+        elif new < 0:
+            table.update(decrement("position"), (where("position") > old))
+            table.update({"position": -1, "date": date, "name": name}, doc_ids=[uid])
+            logging.info("UPDATE\t%s - %s %s\tDropped: %s", ipaddr, thing, uid, date)
         elif old > new:
             table.update(
                 increment("position"),
