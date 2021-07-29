@@ -307,17 +307,18 @@ def move(thing: str):
     new = int(form["new"])
     pos = 0 if (old == new == 0) else (int(maxsize) if old == new else new)
     table = form["table"]
+    old_table = get_table(thing)
     new_table = get_table(table)
     new_uid = -1
 
-    if new_table != thing:
-        val = table.get(doc_id=uid)
+    if table != thing:
+        val = old_table.get(doc_id=uid)
         val["position"] = pos
         new_val = generate_document(val, new_table)
         new_uid = insert_new_thing(new_val, new_table, f"move/{thing}", ipaddr)
-        table.remove(doc_ids=[uid])
+        old_table.remove(doc_ids=[uid])
         if pos != 0:
-            table.update(decrement("position"), (where("position") > old))
+            old_table.update(decrement("position"), (where("position") > old))
         logging.info("MOVE\t%s - %s %s -> %s %s", ipaddr, thing, uid, table, new_uid)
 
     return redirect(f"/{thing}")
