@@ -212,7 +212,7 @@ def insert_new_thing(doc: dict, table: Table, uri: str, ipaddr: str) -> str:
     return uid
 
 
-@app.route("/<string:thing>", methods=["GET", "POST"])
+@app.route("/list/<string:thing>", methods=["GET", "POST"])
 def things(thing: str):
     """View or create items for specific thing"""
     ipaddr = get_ip(request)
@@ -351,7 +351,7 @@ def delete(thing: str):
     return redirect(f"/{thing}")
 
 
-if __name__ == "__main__":
+def _main():
     parser = ArgumentParser(
         formatter_class=ArgumentDefaultsHelpFormatter,
         add_help=False,
@@ -446,3 +446,7 @@ if __name__ == "__main__":
         delete = oidc.require_login(delete)
 
     app.run(host="0.0.0.0", port=port, debug=debug)
+
+
+if __name__ == "__main__":
+    _main()
