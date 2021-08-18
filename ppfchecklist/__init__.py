@@ -50,30 +50,6 @@ def get_ip(req: request) -> str:
         ip_address = req.remote_addr
     return str(ip_address)
 
-
-def get_table(thing: str):
-    """Get data from table in the database"""
-    if thing not in tbls:
-        logging.error("Attempting to access table that does not exist: %s", thing)
-        raise TableNotFoundError(f"'{thing}' is not a valid table name.")
-    return db.table(thing)
-
-
-def get_table_all(thing: str):
-    """Get all data in a table"""
-    if thing not in tbls:
-        logging.error("Attempting to access table that does not exist: %s", thing)
-        raise TableNotFoundError(f"'{thing}' is not a valid table name.")
-    return db.table(thing).all()
-
-
-def get_list(items):
-    """Separate the todo and done lists from a list of Documents"""
-    todo = sorted([a for a in items if a["position"] > 0], key=lambda i: i["position"])
-    done = sorted([a for a in items if a["position"] == 0], key=lambda i: i["date"])
-    return todo, done
-
-
 @app.teardown_appcontext
 def close_connection(exception):
     db = getattr(g, "_database", None)
@@ -108,14 +84,24 @@ def index():
     """List all tables with their todo and done documents"""
     logging.info("GET /\t%s", get_ip(request))
 
-    # things_list = []
-    # for tbl in db.tables():
-    #     todo, done = db.info(tbl)
-    #     things_list.append({"thing": tbl, "todo": todo, "done": done})
+    db = get_db()
+    tables = db.tables()
+    things_list = []
+    for tbl in tables:
+        todo, done = db.info(tbl["rowid"])
+        things_list.append({"thing": tbl["name"], "todo": todo, "done": done})
 
-    # return render_template("index.html", things=things_list, tbls=db._tables)
-    return db.tables()
+    return render_template("index.html", things=things_list, tbls=[t["name"] for t in tables])
 
+
+@app.route("/dump", methods=["GET"])
+def dump():
+    return str(get_db().dump())
+
+@app.route("/load", methods=["GET"])
+def load():
+    get_db().import_json("list.db.sample")
+    return redirect("/")
 
 # def insert_new_thing(doc: dict, table: Table, uri: str, ipaddr: str) -> str:
 #     """Insert a new document into given table
@@ -280,6 +266,7 @@ def things(thing: str):
 
 def get_db():
     db = getattr(g, "_database", None)
+    print("getting db", db)
     if db is None:
         db = g._database = DatabaseSqlite3(getenv("PPF_BASEDIR", "."))
     return db
@@ -317,9 +304,6 @@ def _main():
     output_file = getenv("PPF_LOGFILE", None)
     if output_file and output_file[0] != "/":
         output_file = join(basedir, output_file)
-
-    db = get_db()
-    # db.import_json("tinydb.db")
 
     handler_list = (
         [logging.StreamHandler(stdout), logging.FileHandler(output_file)]

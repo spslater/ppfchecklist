@@ -3,7 +3,7 @@
 <div class="container-fluid" style="font-size:200%">
 	{% for t in todo %}
 	<div class="row">
-		<div class="col-1 col-lg-1">{{ t.position }}</div>
+		<div class="col-1 col-lg-1">{{ t.position }} - {{ t.rowid }}</div>
 		<div class="col-9 col-lg-10">{{ t.name }}</div>
 		<div class="col-2 col-lg-1">
 			<button class="btn btn-primary btn-block" type="button" data-toggle="collapse" data-target=".{{ t.doc_id }}">
@@ -11,7 +11,7 @@
 			</button>
 		</div>
 	</div>
-	{% with collapse_class=t.doc_id, type=type, uid=t.doc_id, position=t.position, name=t.name, tbls=tbls %}
+	{% with collapse_class=t.rowid, type=type, uid=t.rowid, position=t.position, name=t.name, tbls=tbls %}
 		{% include "sub/edit.html" %}
 	{% endwith %}
 	<hr>
