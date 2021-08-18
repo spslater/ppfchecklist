@@ -58,17 +58,32 @@ class DatabaseSqlite3(Database):
 
     def _init_database(self):
         try:
-            self._execute("CREATE TABLE Status (name TEXT UNIQUE, position INT, oderByPosition INT)")
+            self._execute(
+                """CREATE TABLE Status (
+                    name TEXT UNIQUE,
+                    position INT,
+                    orderByPosition INT
+                )"""
+            )
             self._executemany(
                 "INSERT INTO Status VALUES (?, ?, ?)",
-                [("todo", 2, True), ("done", 3, False), ("drop", 4, False), ("prog", 1, True)],
+                [
+                    ("todo", 2, True),
+                    ("done", 3, False),
+                    ("drop", 4, False),
+                    ("prog", 1, True),
+                ],
             )
         except sqlite3.OperationalError as e:
             logging.debug(e)
 
         try:
             self._execute(
-                "CREATE TABLE List (name TEXT UNIQUE, position INT UNIQUE, active INT)"
+                """CREATE TABLE List (
+                    name TEXT UNIQUE,
+                    position INT UNIQUE,
+                    active INT
+                )"""
             )
         except sqlite3.OperationalError as e:
             logging.debug(e)
@@ -115,7 +130,6 @@ class DatabaseSqlite3(Database):
         self._execute("DROP TABLE Status")
         self._init_database()
 
-
         with open(filename, "r") as fp:
             data = load(fp)
 
@@ -135,7 +149,6 @@ class DatabaseSqlite3(Database):
                 )
                 table_id = result[0]["rowid"]
 
-            print("num vals", len(values.values()))
             for value in values.values():
                 position = value.get("position")
                 date = value.get("date")
@@ -172,44 +185,49 @@ class DatabaseSqlite3(Database):
         )
 
     def tables(self):
-        return self._execute(
-            """SELECT rowid, name
+        rows = self._execute(
+            """SELECT name
             FROM List
             WHERE active = 1
             ORDER BY position ASC"""
         )
+        return [r["name"] for r in rows]
 
-    def info(self, rowid: int):
+    def info(self, table: str):
         todo = self._execute(
             """
             SELECT Entry.rowid, * FROM Entry
             JOIN List
-                ON List.rowid = ?
-                AND List.rowid = Entry.list
+                ON List.rowid = Entry.list
+                AND List.name = ?
             JOIN Status
                 ON Status.rowid = Entry.status
                 AND Status.name = 'todo'
             ORDER BY
-                CASE WHEN Status.position == 1 THEN Entry.position END ASC,
-                CASE WHEN Status.position == 0 THEN Entry.date END ASC
+                CASE 
+                    WHEN Status.orderByPosition == 1 THEN Entry.position
+                    WHEN Status.orderByPosition == 0 THEN Entry.date 
+                END ASC
             """,
-            (rowid,),
+            (table,),
         )
 
         done = self._execute(
             """
             SELECT Entry.rowid, * FROM Entry
             JOIN List
-                ON List.rowid = ?
-                AND List.rowid = Entry.list
+                ON List.rowid = Entry.list
+                AND List.name = ?
             JOIN Status
                 ON Status.rowid = Entry.status
                 AND Status.name = 'done'
             ORDER BY
-                CASE WHEN Status.position == 1 THEN Entry.position END ASC,
-                CASE WHEN Status.position == 0 THEN Entry.date END ASC
+                CASE 
+                    WHEN Status.orderByPosition == 1 THEN Entry.position
+                    WHEN Status.orderByPosition == 0 THEN Entry.date 
+                END ASC
             """,
-            (rowid,),
+            (table,),
         )
 
         return todo, done

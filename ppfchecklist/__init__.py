@@ -16,6 +16,7 @@ RequestForm = ImmutableMultiDict[str, str]
 
 app = Flask(__name__, static_url_path="")
 
+
 def getenv_bool(key, default=None):
     value = getenv(key)
     if value is None:
@@ -49,6 +50,7 @@ def get_ip(req: request) -> str:
     except KeyError:
         ip_address = req.remote_addr
     return str(ip_address)
+
 
 @app.teardown_appcontext
 def close_connection(exception):
@@ -88,20 +90,22 @@ def index():
     tables = db.tables()
     things_list = []
     for tbl in tables:
-        todo, done = db.info(tbl["rowid"])
-        things_list.append({"thing": tbl["name"], "todo": todo, "done": done})
+        todo, done = db.info(tbl)
+        things_list.append({"thing": tbl, "todo": todo, "done": done})
 
-    return render_template("index.html", things=things_list, tbls=[t["name"] for t in tables])
+    return render_template("index.html", things=things_list, tbls=tables)
 
 
 @app.route("/dump", methods=["GET"])
 def dump():
     return str(get_db().dump())
 
+
 @app.route("/load", methods=["GET"])
 def load():
     get_db().import_json("list.db.sample")
     return redirect("/")
+
 
 # def insert_new_thing(doc: dict, table: Table, uri: str, ipaddr: str) -> str:
 #     """Insert a new document into given table
@@ -139,16 +143,20 @@ def load():
 def things(thing: str):
     """View or create items for specific thing"""
     ipaddr = get_ip(request)
+
+    db = get_db()
+
     if request.method == "GET":
         logging.info("GET /%s\t%s", thing, ipaddr)
+
         todo, done = db.info(thing)
         return render_template(
-            "things.html", thing=thing, todo=todo, done=done, tbls=db._tables
+            "things.html", thing=thing, todo=todo, done=done, tbls=db.tables()
         )
     # # request.method == "POST"
     # doc = generate_document(request.form, table)
     # insert_new_thing(doc, table, thing, ipaddr)
-    return redirect(f"/{thing}")
+    return redirect(f"/list/{thing}")
 
 
 # @app.route("/update/<string:thing>", methods=["POST"])
