@@ -93,7 +93,7 @@ def index():
         todo, done = db.info(tbl)
         things_list.append({"thing": tbl, "todo": todo, "done": done})
 
-    return render_template("index.html", things=things_list, tbls=tables)
+    return render_template("index.html.j2", things=things_list, tbls=tables)
 
 
 @app.route("/dump", methods=["GET"])
@@ -151,7 +151,7 @@ def things(thing: str):
 
         todo, done = db.info(thing)
         return render_template(
-            "things.html", thing=thing, todo=todo, done=done, tbls=db.tables()
+            "things.html.j2", thing=thing, todo=todo, done=done, tbls=db.tables()
         )
     # # request.method == "POST"
     # doc = generate_document(request.form, table)

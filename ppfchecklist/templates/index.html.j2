@@ -1,6 +1,6 @@
 {% block head %}
 	{% with typeList="Everything" %}
-		{% include "sub/head.html" %}
+		{% include "sub/head.html.j2" %}
 	{% endwith %}
 {% endblock %}
 
@@ -8,7 +8,7 @@
 	{% for t in things %}
 	<div>
 		{% with thing=t.thing, done=t.done, todo=t.todo, tbls=tbls, autofocus=False %}
-			{% include "sub/thing.html" %}
+			{% include "sub/thing.html.j2" %}
 		{% endwith %}
 	</div>
 	{% endfor %}

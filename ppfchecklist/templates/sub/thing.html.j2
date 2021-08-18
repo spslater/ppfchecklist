@@ -1,15 +1,15 @@
 {% with header=thing|title %}
-	{% include "sub/header.html" %}
+  {% include "sub/header.html.j2" %}
 {% endwith %}
 
 {% with type=thing, autofocus=autofocus %}
-	{% include "sub/form.html" %}
+  {% include "sub/form.html.j2" %}
 {% endwith %}
 
 {% with todo=todo, type=thing, tbls=tbls %}
-	{% include "sub/todo.html" %}
+  {% include "sub/position_list.html.j2" %}
 {% endwith %}
 
 {% with done=done, type=thing, tbls=tbls %}
-	{% include "sub/done.html" %}
+  {% include "sub/date_list.html.j2" %}
 {% endwith %}

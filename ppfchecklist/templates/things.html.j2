@@ -1,12 +1,12 @@
 {% block head %}
 	{% with typeList=thing|title %}
-		{% include "sub/head.html" %}
+		{% include "sub/head.html.j2" %}
 	{% endwith %}
 {% endblock %}
 
 {% block body %}
 	<div style="float:right"><a href="/">Home</a></div>
 	{% with thing=thing, done=done, todo=todo, tbls=tbls, autofocus=True %}
-		{% include "sub/thing.html" %}
+		{% include "sub/thing.html.j2" %}
 	{% endwith %}
 {% endblock %}
