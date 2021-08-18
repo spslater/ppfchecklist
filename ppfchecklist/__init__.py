@@ -1,202 +1,20 @@
 """Flask app for a reading list"""
-
 import logging
-import sqlite3
-from abc import ABC, abstractmethod
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from datetime import datetime
-from io import UnsupportedOperation
-from json import dumps, load
-from os import fsync, getenv
+from os import getenv
 from os.path import join
 from sys import maxsize, stdout
 
 from dotenv import load_dotenv
 from flask import Flask, g, redirect, render_template, request, send_from_directory
-from tinydb import JSONStorage, TinyDB, where
-from tinydb.operations import decrement, increment
-from tinydb.table import Document, Table
 from werkzeug.datastructures import ImmutableMultiDict
+
+from .database import DatabaseSqlite3
 
 RequestForm = ImmutableMultiDict[str, str]
 
-
-class PrettyJSONStorage(JSONStorage):
-    """Story TinyDB data in a pretty format"""
-
-    # pylint: disable=redefined-outer-name
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def write(self, data):
-        self._handle.seek(0)
-        serialized = dumps(data, indent=4, sort_keys=True, **self.kwargs)
-        try:
-            self._handle.write(serialized)
-        except UnsupportedOperation as e:
-            raise IOError(
-                f'Cannot write to the database. Access mode is "{self._mode}"'
-            ) from e
-
-        self._handle.flush()
-        fsync(self._handle.fileno())
-
-        self._handle.truncate()
-
-
-class TableNotFoundError(Exception):
-    """Custom exception when table in database isn't found"""
-
-    def __init__(self, message):
-        super().__init__(message)
-        self.message = message
-
-
-class Database:
-    def __init__(
-        self,
-        basedir: str = None,
-        filename: str = None,
-        tables: str = None,
-    ):
-        self._basedir = basedir or getenv("PPF_BASEDIR", ".")
-
-        filename = filename or getenv("PPF_DATABASE", "list.db")
-        self._filename = join(self._basedir, filename)
-
-        tables = tables or getenv("PPF_TABLES", "tables.json")
-        self._tables_file = join(self._basedir, tables)
-        with open(self._tables_file, "r") as fp:
-            self._tables = load(fp)
-
-    def _get_table(self, name: str):
-        raise NotImplementedError
-
-    def info(self, table: str):
-        raise NotImplementedError
-
-    def insert(self, form: dict):
-        raise NotImplementedError
-
-    def update(self, form: dict):
-        raise NotImplementedError
-
-    def move(self, form: dict):
-        raise NotImplementedError
-
-    def delete(self, form: dict):
-        raise NotImplementedError
-
-
-class DatabaseSqlite3(Database):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        # self._connection = self._get_connection()
-        # self._connection.row_factory = sqlite3.Row
-        # self._database = self._connection.cursor()
-
-        try:
-            self._execute(
-                """CREATE TABLE ppfchecklist
-                (date TEXT, position INTEGER, name TEXT, checklist TEXT)"""
-            )
-        except sqlite3.OperationalError as e:
-            logging.debug(e)
-        except sqlite3.DatabaseError as e:
-            logging.exception("Database provided is not an sqlite3 database")
-            self._connection.close()
-            raise e
-
-    def _connection(self):
-        db = getattr(g, "_sqlite3_database", None)
-        if db is None:
-            db = g._sqlite3_database = sqlite3.connect(self._filename)
-            db.row_factory = sqlite3.Row
-        return db
-
-    def _execute(self, sql: str, parameters: tuple = None):
-        db = self._connection()
-        cur = db.cursor()
-        result = cur.execute(sql, parameters) if parameters else cur.execute(sql)
-        db.commit()
-        return result
-
-    def _executemany(self, sql: str, parameters: tuple = None):
-        db = self._connection()
-        cur = db.cursor()
-        result = cur.executemany(sql, parameters) if parameters else cur.executemany(sql)
-        db.commit()
-        return result
-
-    def import_json(self, filename: str):
-        with open(filename, "r") as fp:
-            data = load(fp)
-
-        for table, values in data.items():
-            if table == "_default":
-                continue
-
-            entries = [
-                (val.get("date"), val.get("position"), val.get("name"), table)
-                for val in values.values()
-            ]
-            self._executemany("INSERT INTO ppfchecklist VALUES (?, ?, ?, ?)", entries)
-
-    def _get_table(self, name: str):
-        if name not in self._tables:
-            logging.error("Attempting to access table that does not exist: %s", name)
-            raise TableNotFoundError(f"'{name}' is not a valid table name.")
-
-    def info(self, table: str):
-        self._get_table(table)
-        todo = self._execute(
-            """
-            SELECT * FROM ppfchecklist
-            WHERE checklist = ? AND position > 0
-            ORDER BY position ASC
-            """,
-            (table,),
-        ).fetchall()
-
-        done = self._execute(
-            """
-            SELECT * FROM ppfchecklist
-            WHERE checklist = ? AND position = 0
-            ORDER BY date ASC
-            """,
-            (table,),
-        ).fetchall()
-
-        return todo, done
-
-
-class DatabaseTinyDB(Database):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._database = TinyDB(self._filename, storage=PrettyJSONStorage)
-
-    def _get_table(self, name: str):
-        if name not in self._tables:
-            logging.error("Attempting to access table that does not exist: %s", name)
-            raise TableNotFoundError(f"'{name}' is not a valid table name.")
-        return self._database.table(name)
-
-    def info(self, table: str):
-        items = self._get_table(table).all()
-        todo = sorted(
-            [a for a in items if a["position"] > 0],
-            key=lambda i: i["position"],
-        )
-        done = sorted(
-            [a for a in items if a["position"] == 0],
-            key=lambda i: i["date"],
-        )
-        return todo, done
-
-
 app = Flask(__name__, static_url_path="")
-
 
 def getenv_bool(key, default=None):
     value = getenv(key)
@@ -233,47 +51,34 @@ def get_ip(req: request) -> str:
     return str(ip_address)
 
 
-def get_table(thing: str) -> Table:
-    """Get data from table in the database
-
-    :param thing: name of table to lookup
-    :type thing: str
-    :raises TableNotFoundError: table does not exist in database
-    :return: table from with the name passed in
-    :rtype: Table
-    """
+def get_table(thing: str):
+    """Get data from table in the database"""
     if thing not in tbls:
         logging.error("Attempting to access table that does not exist: %s", thing)
         raise TableNotFoundError(f"'{thing}' is not a valid table name.")
     return db.table(thing)
 
 
-def get_table_all(thing: str) -> list[Document]:
-    """Get all data in a table
-
-    :param thing: name of table to lookup
-    :type thing: str
-    :raises TableNotFoundError: table does not exist in database
-    :return: list of documents in the table
-    :rtype: list[Document]
-    """
+def get_table_all(thing: str):
+    """Get all data in a table"""
     if thing not in tbls:
         logging.error("Attempting to access table that does not exist: %s", thing)
         raise TableNotFoundError(f"'{thing}' is not a valid table name.")
     return db.table(thing).all()
 
 
-def get_list(items: list[Document]) -> tuple[list[Document], list[Document]]:
-    """Separate the todo and done lists from a list of Documents
-
-    :param items: list of Documents to split
-    :type items: list[Document]
-    :return: the todo and done items from given list of Documents
-    :rtype: tuple[list[Document], list[Document]]
-    """
+def get_list(items):
+    """Separate the todo and done lists from a list of Documents"""
     todo = sorted([a for a in items if a["position"] > 0], key=lambda i: i["position"])
     done = sorted([a for a in items if a["position"] == 0], key=lambda i: i["date"])
     return todo, done
+
+
+@app.teardown_appcontext
+def close_connection(exception):
+    db = getattr(g, "_database", None)
+    if db is not None:
+        db.close()
 
 
 @app.route("/favicon.ico")
@@ -286,16 +91,8 @@ def favicon():
     )
 
 
-def generate_document(form: RequestForm, table: Table) -> dict:
-    """Generate an document to update current data with
-
-    :param form: flask request form
-    :type form: RequestForm
-    :param table: table to get position information from
-    :type table: Table
-    :return: info to update document with
-    :rtype: dict
-    """
+def generate_document(form: RequestForm, table) -> dict:
+    """Generate an document to update current data with"""
     max_pos = max([int(a["position"]) for a in table]) if len(table) else 0
 
     pos = max(0, int(form["position"] if form["position"] != "" else maxsize))
@@ -311,12 +108,13 @@ def index():
     """List all tables with their todo and done documents"""
     logging.info("GET /\t%s", get_ip(request))
 
-    things_list = []
-    for tbl in db._tables:
-        todo, done = db.info(tbl)
-        things_list.append({"thing": tbl, "todo": todo, "done": done})
+    # things_list = []
+    # for tbl in db.tables():
+    #     todo, done = db.info(tbl)
+    #     things_list.append({"thing": tbl, "todo": todo, "done": done})
 
-    return render_template("index.html", things=things_list, tbls=db._tables)
+    # return render_template("index.html", things=things_list, tbls=db._tables)
+    return db.tables()
 
 
 # def insert_new_thing(doc: dict, table: Table, uri: str, ipaddr: str) -> str:
@@ -351,7 +149,7 @@ def index():
 #     return uid
 
 
-@app.route("/<string:thing>", methods=["GET", "POST"])
+@app.route("/list/<string:thing>", methods=["GET", "POST"])
 def things(thing: str):
     """View or create items for specific thing"""
     ipaddr = get_ip(request)
@@ -480,7 +278,14 @@ def things(thing: str):
 #     return redirect(f"/{thing}")
 
 
-if __name__ == "__main__":
+def get_db():
+    db = getattr(g, "_database", None)
+    if db is None:
+        db = g._database = DatabaseSqlite3(getenv("PPF_BASEDIR", "."))
+    return db
+
+
+def _main():
     parser = ArgumentParser(
         formatter_class=ArgumentDefaultsHelpFormatter,
         add_help=False,
@@ -513,17 +318,8 @@ if __name__ == "__main__":
     if output_file and output_file[0] != "/":
         output_file = join(basedir, output_file)
 
-    instance_type = getenv("PPF_DATABASE_TYPE", "tinydb")
-    if instance_type == "sqlite3":
-        db = DatabaseSqlite3(basedir)
-        db.import_json("tinydb.db")
-    elif instance_type == "tinydb":
-        db = DatabaseTinyDB(basedir)
-    else:
-        raise ValueError(
-            "Database type is invalid,"
-            f'must be either "sqlite3" or "tinydb" not "{instance_type}"'
-        )
+    db = get_db()
+    # db.import_json("tinydb.db")
 
     handler_list = (
         [logging.StreamHandler(stdout), logging.FileHandler(output_file)]
@@ -547,32 +343,36 @@ if __name__ == "__main__":
         handlers=handler_list,
     )
 
-    if getenv_bool("PPF_AUTHORIZE", False):
-        logging.debug("Setting up authorizing via OpenID Connect")
-        from flask_oidc import OpenIDConnect
+    # if getenv_bool("PPF_AUTHORIZE", False):
+    #     logging.debug("Setting up authorizing via OpenID Connect")
+    #     from flask_oidc import OpenIDConnect
 
-        app.config.update(
-            {
-                "SECRET_KEY": getenv("SECRET_KEY", "SUPERSECRETKEYTELLNOONE"),
-                "TESTING": debug,
-                "DEBUG": debug,
-                "OIDC_CLIENT_SECRETS": getenv("OIDC_CLIENT_SECRETS"),
-                "OIDC_ID_TOKEN_COOKIE_SECURE": True,
-                "OIDC_REQUIRE_VERIFIED_EMAIL": False,
-                "OIDC_USER_INFO_ENABLED": True,
-                "OIDC_VALID_ISSUERS": getenv("OIDC_VALID_ISSUERS"),
-                "OIDC_OPENID_REALM": getenv("OIDC_OPENID_REALM"),
-                "OIDC_SCOPES": "openid",
-                "OIDC_INTROSPECTION_AUTH_METHOD": "client_secret_post",
-            }
-        )
-        oidc = OpenIDConnect()
-        oidc.init_app(app)
+    #     app.config.update(
+    #         {
+    #             "SECRET_KEY": getenv("SECRET_KEY", "SUPERSECRETKEYTELLNOONE"),
+    #             "TESTING": debug,
+    #             "DEBUG": debug,
+    #             "OIDC_CLIENT_SECRETS": getenv("OIDC_CLIENT_SECRETS"),
+    #             "OIDC_ID_TOKEN_COOKIE_SECURE": True,
+    #             "OIDC_REQUIRE_VERIFIED_EMAIL": False,
+    #             "OIDC_USER_INFO_ENABLED": True,
+    #             "OIDC_VALID_ISSUERS": getenv("OIDC_VALID_ISSUERS"),
+    #             "OIDC_OPENID_REALM": getenv("OIDC_OPENID_REALM"),
+    #             "OIDC_SCOPES": "openid",
+    #             "OIDC_INTROSPECTION_AUTH_METHOD": "client_secret_post",
+    #         }
+    #     )
+    #     oidc = OpenIDConnect()
+    #     oidc.init_app(app)
 
-        index = oidc.require_login(index)
-        things = oidc.require_login(things)
-        update = oidc.require_login(update)
-        move = oidc.require_login(move)
-        delete = oidc.require_login(delete)
+    #     index = oidc.require_login(index)
+    #     things = oidc.require_login(things)
+    #     update = oidc.require_login(update)
+    #     move = oidc.require_login(move)
+    #     delete = oidc.require_login(delete)
 
     app.run(host="0.0.0.0", port=port, debug=debug)
+
+
+if __name__ == "__main__":
+    _main()
