@@ -1,6 +1,7 @@
 <!-- Todo List -->
 {% if todo|length > 0 %}
   <div class="container-fluid" style="font-size: 200%">
+  <h2>{{ title }}</h2>
     {% for t in todo %}
     <div class="row">
       <div class="col-1 col-lg-1">{{ t.position }}</div>
@@ -16,7 +17,7 @@
         </button>
       </div>
     </div>
-    {% with collapse_class=t.rowid, type=type, rowid=t.rowid, position=t.position, name=t.name, tbls=tbls %}
+    {% with collapse_class=t.rowid, type=type, rowid=t.rowid, position=t.position, name=t.name, status=t.status_id , statuses=status, tbls=tbls %}
       {% include "sub/edit.html.j2" %}
     {% endwith %}
     <hr />

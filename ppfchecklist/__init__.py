@@ -69,28 +69,6 @@ def favicon():
     )
 
 
-@app.route("/", methods=["GET"])
-def index():
-    """List all tables with their todo and done documents"""
-    logging.info("GET /\t%s", get_ip(request))
-
-    db = get_db()
-    tables = db.tables()
-    things_list = []
-    for tbl in tables:
-        todo, done = db.info(tbl)
-        things_list.append(
-            {
-                "thing": tbl,
-                "todo": todo,
-                "done": done,
-                "status": db.status(tbl),
-            }
-        )
-
-    return render_template("index.html.j2", things=things_list, tbls=tables)
-
-
 @app.route("/dump", methods=["GET"])
 def dump():
     return str(get_db().dump())
@@ -102,129 +80,66 @@ def load():
     return redirect("/")
 
 
-@app.route("/list/<string:thing>", methods=["GET", "POST"])
-def things(thing: str):
-    """View or create items for specific thing"""
-    ipaddr = get_ip(request)
+@app.route("/", methods=["GET"])
+def index():
+    """List all tables with their todo and done documents"""
+    logging.info("GET /\t%s", get_ip(request))
 
     db = get_db()
-
-    if request.method == "GET":
-        logging.info("GET /%s\t%s", thing, ipaddr)
-
-        todo, done = db.info(thing)
-        return render_template(
-            "things.html.j2",
-            thing=thing,
-            todo=todo,
-            done=done,
-            tbls=db.tables(),
-            status=db.status(thing),
+    tables = db.tables()
+    things_list = []
+    for table in tables:
+        tbl = table["name"]
+        results = db.info(tbl)
+        things_list.append(
+            {
+                "thing": table,
+                "results": results,
+                "status": db.status(tbl),
+            }
         )
-    db.insert(request.form, thing)
+
+    return render_template("index.html.j2", things=things_list, tbls=tables)
+
+
+@app.route("/list/<string:thing>", methods=["GET"])
+def things(thing: str):
+    """View or create items for specific thing"""
+    logging.info("GET /%s\t%s", thing, get_ip(request))
+
+    db = get_db()
+    results = db.info(thing)
+
+    return render_template(
+        "things.html.j2",
+        thing=db.table(thing),
+        results=results,
+        tbls=db.tables(),
+        status=db.status(thing),
+    )
+
+
+@app.route("/insert/<string:thing>", methods=["POST"])
+def insert(thing: str):
+    """Insert item in list"""
+    ipaddr = get_ip(request)
+    get_db().insert(request.form, thing)
     return redirect(f"/list/{thing}")
 
 
-# @app.route("/update/<string:thing>", methods=["POST"])
-# def update(thing: str):
-#     """Update item in list"""
-#     ipaddr = get_ip(request)
-#     table = get_table(thing)
-
-#     form = request.form
-#     uid = int(form["uid"])
-#     new = int(form["new"])
-#     old = int(form["old"])
-#     name = form["name"].strip()
-#     date = form["date"] if form["date"] else datetime.now().strftime("%Y-%m-%d")
-
-#     try:
-#         if old == new == 0:
-#             table.update({"date": date, "name": name}, doc_ids=[uid])
-#             logging.info(
-#                 "UPDATE\t%s - %s %s\tChange Complete Date: %s",
-#                 ipaddr,
-#                 thing,
-#                 uid,
-#                 date,
-#             )
-#         elif old == new:
-#             table.update({"name": name}, doc_ids=[uid])
-#             logging.info("UPDATE\t%s - %s %s\tName Only: %s", ipaddr, thing, uid, name)
-#         elif new <= 0:
-#             table.update(decrement("position"), (where("position") > old))
-#             table.update({"position": 0, "date": date, "name": name}, doc_ids=[uid])
-#             logging.info(
-#                 "UPDATE\t%s - %s %s\tFirst Complete: %s", ipaddr, thing, uid, date
-#             )
-#         elif old > new:
-#             table.update(
-#                 increment("position"),
-#                 (where("position") >= new) & (where("position") < old),
-#             )
-#             table.update({"position": new, "name": name}, doc_ids=[uid])
-#             logging.info(
-#                 "UPDATE\t%s - %s %s\tMove Up In Rank\t%s -> %s",
-#                 ipaddr,
-#                 thing,
-#                 uid,
-#                 old,
-#                 new,
-#             )
-#         elif old < new:
-#             table.update(
-#                 decrement("position"),
-#                 (where("position") <= new) & (where("position") > old),
-#             )
-#             table.update({"position": new, "name": name}, doc_ids=[uid])
-#             logging.info(
-#                 "UPDATE\t%s - %s %s\tMove Down In Rank\t%s -> %s",
-#                 ipaddr,
-#                 thing,
-#                 uid,
-#                 old,
-#                 new,
-#             )
-#     # pylint: disable=broad-except
-#     except Exception:
-#         logging.exception("UPDATE\t%s - %s %s: %s", ipaddr, thing, uid, form)
-
-#     return redirect(f"/{thing}")
-
-
-# @app.route("/move/<string:thing>", methods=["POST"])
-# def move(thing: str):
-#     """Move item from one list to another"""
-#     ipaddr = get_ip(request)
-#     table = get_table(thing)
-
-#     form = request.form
-#     uid = int(form["uid"])
-#     old = int(form["old"])
-#     new = int(form["new"])
-#     pos = 0 if (old == new == 0) else (int(maxsize) if old == new else new)
-#     table = form["table"]
-#     new_table = get_table(table)
-#     new_uid = -1
-
-#     if new_table != thing:
-#         val = table.get(doc_id=uid)
-#         val["position"] = pos
-#         new_val = generate_document(val, new_table)
-#         new_uid = insert_new_thing(new_val, new_table, f"move/{thing}", ipaddr)
-#         table.remove(doc_ids=[uid])
-#         if pos != 0:
-#             table.update(decrement("position"), (where("position") > old))
-#         logging.info("MOVE\t%s - %s %s -> %s %s", ipaddr, thing, uid, table, new_uid)
-
-#     return redirect(f"/{thing}")
+@app.route("/update/<string:thing>", methods=["POST"])
+def update(thing: str):
+    """Update item in list"""
+    ipaddr = get_ip(request)
+    goto = get_db().update(request.form, thing)
+    return redirect(f"/list/{goto}")
 
 
 @app.route("/delete/<string:thing>", methods=["POST"])
 def delete(thing: str):
     """Remove item from table"""
     ipaddr = get_ip(request)
-    get_db().delete(request.form, thing)
+    get_db().delete(request.form)
     logging.info("DELETE\t%s - %s", ipaddr, thing)
     return redirect(f"/list/{thing}")
 

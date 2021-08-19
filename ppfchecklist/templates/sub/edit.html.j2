@@ -1,16 +1,33 @@
 
 <div class="collapse {{ collapse_class }}">
-  <form action="/update/{{ type }}" method="POST">
+  <form action="/update/{{ type.name }}" method="POST">
     <div class="form-row">
       <input class="form-control" type="hidden" id="rowid" name="rowid" value="{{ rowid }}">
-      <input class="form-control" type="hidden" id="old" name="old" value="{{ position }}">
+      <input class="form-control" type="hidden" id="old_name" name="old_name" value="{{ name }}">
+      <input class="form-control" type="hidden" id="old_date" name="old_date" value="{{ date }}">
+      <input class="form-control" type="hidden" id="old_pos" name="old_pos" value="{{ position }}">
+      <input class="form-control" type="hidden" id="old_status" name="old_status" value="{{ status }}">
       <div class="form-group col-12">
         <input class="form-control" type="text" id="name" name="name" value="{{ name }}">
       </div>
-      <div class="form-group col-4 col-sm-6 col-md-2">
-        <input class="form-control" type="number" id="new" name="new" placeholder="{{ position }}" value="{{ position }}">
+      <div class="from-group col-6">
+        <select class="form-control" id="table" name="table">
+          {% for table in tbls %}
+          <option value="{{ table.rowid }}" {% if table.rowid == type.rowid %}selected{% endif %}>{{ table.name|title }}</option>
+          {% endfor %}
+        </select>
       </div>
-      <div class="form-group col-5 col-sm-4 col-md-7">
+      <div class="form-group col-6">
+        <select class="form-control" name="status" id="status">
+          {% for stat in statuses %}
+            <option value="{{ stat.rowid }}" {% if stat.rowid == status %}selected{% endif %}>{{ stat.name|title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group col-3 col-sm-4 col-md-3">
+        <input class="form-control" type="number" id="pos" name="pos" placeholder="{{ position }}" value="{{ position }}">
+      </div>
+      <div class="form-group col-6 col-sm-6 col-md-6">
         <input class="form-control" type="date" id="date" name="date" value="{{ date }}">
       </div>
       <div class="form-group col-3 col-sm-2 col-md-3">
@@ -18,27 +35,7 @@
       </div>
     </div>
   </form>
-  <form action="/move/{{ type }}" method="POST">
-    <div class="form-row">
-      <input class="form-control" type="hidden" id="rowid" name="rowid" value="{{ rowid }}">
-      <input class="form-control" type="hidden" id="name" name="name" value="{{ name }}">
-      <input class="form-control" type="hidden" id="old" name="old" value="{{ position }}">
-      <div class="form-group col-3 col-sm-6 col-md-2">
-        <input class="form-control" type="number" id="new" name="new" placeholder="{{ position }}" value="{{ position }}">
-      </div>
-      <div class="from-group col-3 col-sm-4 col-md-7">
-        <select class="form-control" id="table" name="table">
-          {% for table in tbls %}
-          <option value="{{ table }}" {% if table == type %}selected{% endif %}>{{ table }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="form-group col-6 col-sm-2 col-md-3">
-        <button type="submit" class="btn btn-primary btn-block">Move</button>
-      </div>
-    </div>
-  </form>
-  <form action="/delete/{{ type }}" method="POST">
+  <form action="/delete/{{ type.name }}" method="POST">
     <div class="form-row">
       <input class="form-control" type="hidden" id="rowid" name="rowid" value="{{ rowid }}">
       <div class="form-group col-9 col-sm-10 col-md-9">

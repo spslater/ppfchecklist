@@ -1,7 +1,7 @@
 <!-- Done List -->
 {% if done|length > 0 %}
 <div class="container-fluid" style="font-size: 150%">
-  <h2>Completed</h2>
+  <h2>{{ title }}</h2>
   {% for d in done %}
   <div class="row">
     <div class="col-4 col-md-3 col-lg-2">{{ d.date }}</div>
@@ -11,14 +11,14 @@
         class="btn btn-primary btn-block"
         type="button"
         data-toggle="collapse"
-        data-target=".{{ type }}_{{ d.doc_id }}"
+        data-target=".{{ type.rowid }}_{{ d.rowid }}"
       >
         Edit
       </button>
     </div>
   </div>
-  {% set collapse_class = type ~ '_' ~ d.doc_id %}
-  {% with collapse_class=collapse_class, type=type, rowid=d.rowid, date=d.date, position=d.position, name=d.name, tbls=tbls %}
+  {% set collapse_class = type.rowid ~ "_" ~ d.rowid %}
+  {% with collapse_class=collapse_class, type=type, rowid=d.rowid, date=d.date, position=d.position, name=d.name, status=d.status_id, statuses=status, tbls=tbls %}
     {% include "sub/edit.html.j2" %}
   {% endwith %}
   <br />
