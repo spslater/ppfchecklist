@@ -220,9 +220,10 @@ if getenv_bool("PPF_AUTHORIZE", False):
     oidc.init_app(app)
 
     index = oidc.require_login(index)
+    dump = oidc.require_login(dump)
+    upload = oidc.require_login(upload)
     things = oidc.require_login(things)
     update = oidc.require_login(update)
-    move = oidc.require_login(move)
     delete = oidc.require_login(delete)
 
 app.run(host="0.0.0.0", port=port, debug=debug)
