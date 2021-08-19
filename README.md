@@ -15,7 +15,7 @@ Upgrading from the previous TinyDB version of PPF Checklist just requires going 
 PPF Checklist loads it's settings from environment variables set. It defaults to using for a
 `.flaskenv` and `.env` file
 
-See `.flaskenv.sample` for values that will be loaded from the environment and their defaults.
+See `.flaskenv` for values that will be loaded from the environment and their defaults.
 
 ## Endpoints
 Done items are displayed below the list, with dates completed next to it.

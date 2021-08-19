@@ -9,7 +9,6 @@ services:
     ports:
       - 5000:80
     volumes:
-      - ./.env.sample:/usr/src/app/.env
+      - ./.flaskenv:/usr/src/app/.flaskenv
       - ./client_secrets.json.sample:/usr/src/app/client_secrets.json
-      - ./list.db.sample:/usr/src/app/list.db
-      - ./tables.json.sample:/usr/src/app/tables.json
+      - ./sqlite.db:/usr/src/app/sqlite.db
