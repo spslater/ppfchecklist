@@ -155,7 +155,7 @@ class DatabaseSqlite3(Database):
         self.connection.commit()
         return result
 
-    def import_json(self, filename: str):
+    def upload(self, data):
         logging.debug("Dropping tables")
         self._execute("DROP TABLE Entry")
         self._execute("DROP TABLE ListStatus")
@@ -163,9 +163,6 @@ class DatabaseSqlite3(Database):
         self._execute("DROP TABLE Status")
         logging.debug("Loading tables again")
         self._init_database()
-
-        with open(filename, "r") as fp:
-            data = load(fp)
 
         tbl_pos = 1
         for table, values in data.items():
@@ -226,13 +223,13 @@ class DatabaseSqlite3(Database):
                 except sqlite3.IntegrityError:
                     pass
 
-    def dump(self):
-        return (
-            [tuple(v) for v in self._execute("SELECT rowid, * FROM Status")],
-            [tuple(v) for v in self._execute("SELECT rowid, * FROM List")],
-            [tuple(v) for v in self._execute("SELECT rowid, * FROM ListStatus")],
-            [tuple(v) for v in self._execute("SELECT rowid, * FROM Entry")],
-        )
+    def download(self):
+        return {
+            "Status": [dict(v) for v in self._execute("SELECT rowid, * FROM Status")],
+            "List": [dict(v) for v in self._execute("SELECT rowid, * FROM List")],
+            "ListStatus": [dict(v) for v in self._execute("SELECT rowid, * FROM ListStatus")],
+            "Entry": [dict(v) for v in self._execute("SELECT rowid, * FROM Entry")],
+        }
 
     def tables(self):
         return self._execute(

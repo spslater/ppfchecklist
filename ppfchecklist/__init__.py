@@ -2,12 +2,13 @@
 import logging
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from datetime import datetime
+from json import load
 from os import getenv
 from os.path import join
 from sys import maxsize, stdout
 
 from dotenv import load_dotenv
-from flask import Flask, g, redirect, render_template, request, send_from_directory
+from flask import Flask, g, redirect, render_template, request, send_from_directory, jsonify
 from werkzeug.datastructures import ImmutableMultiDict
 
 from .database import DatabaseSqlite3
@@ -69,14 +70,20 @@ def favicon():
     )
 
 
-@app.route("/dump", methods=["GET"])
+@app.route("/download", methods=["GET"])
 def dump():
-    return str(get_db().dump())
+    return jsonify(get_db().download())
 
 
-@app.route("/load", methods=["GET"])
-def load():
-    get_db().import_json("list.db.sample")
+@app.route("/upload", methods=["GET", "POST"])
+def upload():
+    """Upload json to load info into database"""
+    if request.method == "GET":
+        return render_template("upload.html.j2")
+
+    filename = request.files["filename"]
+    data = load(filename.stream)
+    get_db().upload(data)
     return redirect("/")
 
 
