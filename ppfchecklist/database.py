@@ -297,12 +297,52 @@ class DatabaseSqlite3(Database):
 
         return todo, done
 
+    def _incrament(self, table_id, status_id, position):
+        self._execute(
+            """
+            UPDATE Entry
+            SET position = position + 1
+            WHERE rowid IN (
+                SELECT Entry.rowid
+                FROM Entry
+                JOIN List
+                    ON List.rowid = Entry.list
+                    AND List.rowid = ?
+                JOIN Status
+                    ON Status.rowid = Entry.status
+                    AND Status.rowid = ?
+                WHERE Entry.position >= ?
+            )
+            """,
+            (table_id, status_id, position),
+        )
+
+    def _decrament(self, table_id, status_id, position):
+        self._execute(
+            """
+            UPDATE Entry
+            SET position = position - 1
+            WHERE rowid IN (
+                SELECT Entry.rowid
+                FROM Entry
+                JOIN List
+                    ON List.rowid = Entry.list
+                    AND List.rowid = ?
+                JOIN Status
+                    ON Status.rowid = Entry.status
+                    AND Status.rowid = ?
+                WHERE Entry.position <= ?
+            )
+            """,
+            (table_id, status_id, position),
+        )
+
     def insert(self, form, table):
-        status = [s for s in self.status(table) if s["rowid"] == form["rowid"]][0]
+        status = [s for s in self.status(table) if s["rowid"] == int(form["status"])][0]
         status_id = status["rowid"]
         orderByPosition = status["orderByPosition"]
         table_id = self._execute(
-                "SELECT rowid FROM Table WHERE name = ?",
+                "SELECT rowid FROM List WHERE name = ?",
                 (table,)
             )[0]["rowid"]
         name = form["name"].strip()
@@ -310,11 +350,10 @@ class DatabaseSqlite3(Database):
         position = None
 
         if orderByPosition:
-            # max_pos = max([int(a["position"]) for a in table]) if len(table) else 0
             try:
                 max_pos = self._execute(
                     """
-                    SELECT MAX(position)
+                    SELECT MAX(Entry.position)
                     FROM Entry
                     JOIN List
                         ON List.rowid = Entry.list
@@ -324,49 +363,20 @@ class DatabaseSqlite3(Database):
                         AND Status.rowid = ?
                     """,
                     (table_id, status_id),
-                )[0]
+                )[0][0]
             except IndexError:
                 max_pos = 0
             pos = max(1, int(form["position"] if form["position"] != "" else maxsize))
             position = pos if (pos <= max_pos) else (max_pos + 1)
 
-            # if position > 0:
-            #     table.update(increment("position"), where("position") >= doc["position"])
-            #     doc.pop("date", None)
-            #     uid = table.insert(doc)
             if position <= max_pos:
-                # update existing fields to slot in middle of list
-                self._execute(
-                    """
-                    UPDATE Entry
-                    SET position = position + 1
-                    FROM Entry
-                        JOIN List
-                            ON List.rowid = Entry.list
-                            AND List.name = ?
-                        JOIN Status
-                            ON Status.rowid = Entry.status
-                            AND Status.rowid = ?
-                    WHERE position >= ?
-                    """,
-                    (table, status_id, position),
-                )
+                self._incrament(table_id, status_id, position)
         else:
-            # elif doc["position"] <= 0:
-            #     doc["position"] = 0
-            #     if not doc["date"]:
-            #         doc["date"] = datetime.now().strftime("%Y-%m-%d")
-            #     uid = table.insert(doc)
             if form.get("date", "") == "":
                 date = datetime.now().strftime("%Y-%m-%d")
             else:
                 date = form["date"]
 
-        # name TEXT NOT NULL,
-        # position INTEGER,
-        # date TEXT,
-        # status INT,
-        # list INT,
         self._execute(
             """
             INSERT INTO Entry
@@ -374,4 +384,3 @@ class DatabaseSqlite3(Database):
             """,
             (name, position, date, status_id, table_id)
         )
-        # return uid

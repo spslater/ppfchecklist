@@ -69,18 +69,6 @@ def favicon():
     )
 
 
-def generate_document(form: RequestForm, table) -> dict:
-    """Generate an document to update current data with"""
-    max_pos = max([int(a["position"]) for a in table]) if len(table) else 0
-
-    pos = max(0, int(form["position"] if form["position"] != "" else maxsize))
-    position = pos if (pos <= max_pos) else (max_pos + 1)
-    name = form["name"].strip()
-    date = form["date"] if "date" in form else datetime.now().strftime("%Y-%m-%d")
-
-    return {"position": position, "name": name, "date": date}
-
-
 @app.route("/", methods=["GET"])
 def index():
     """List all tables with their todo and done documents"""
@@ -114,38 +102,6 @@ def load():
     return redirect("/")
 
 
-# def insert_new_thing(doc: dict, table: Table, uri: str, ipaddr: str) -> str:
-#     """Insert a new document into given table
-
-#     :param doc: Data for new thing
-#     :type doc: dict
-#     :param table: table to insert into
-#     :type table: Table
-#     :param uri: path request was made for, for logging purposes
-#     :type uri: str
-#     :param ipaddr: ip request came from, for logging purposes
-#     :type ipaddr: str
-#     :return: new unique id for the document
-#     :rtype: str
-#     """
-#     uid = -1
-#     try:
-#         if doc["position"] > 0:
-#             table.update(increment("position"), where("position") >= doc["position"])
-#             doc.pop("date", None)
-#             uid = table.insert(doc)
-#         elif doc["position"] <= 0:
-#             doc["position"] = 0
-#             if not doc["date"]:
-#                 doc["date"] = datetime.now().strftime("%Y-%m-%d")
-#             uid = table.insert(doc)
-#         logging.info("POST /%s\t%s - %s", uri, ipaddr, doc)
-#     # pylint: disable=broad-except
-#     except Exception:
-#         logging.exception("POST /%s\t%s - %s", uri, ipaddr, doc)
-#     return uid
-
-
 @app.route("/list/<string:thing>", methods=["GET", "POST"])
 def things(thing: str):
     """View or create items for specific thing"""
@@ -165,9 +121,6 @@ def things(thing: str):
             tbls=db.tables(),
             status=db.status(thing),
         )
-    # request.method == "POST"
-    # doc = generate_document(request.form, table)
-    # insert_new_thing(doc, table, thing, ipaddr)
     db.insert(request.form, thing)
     return redirect(f"/list/{thing}")
 
