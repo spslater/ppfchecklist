@@ -18,7 +18,7 @@
     </div>
   </div>
   {% set collapse_class = type ~ '_' ~ d.doc_id %}
-  {% with collapse_class=collapse_class, type=type, uid=d.doc_id, date=d.date, position=d.position, name=d.name, tbls=tbls %}
+  {% with collapse_class=collapse_class, type=type, rowid=d.rowid, date=d.date, position=d.position, name=d.name, tbls=tbls %}
     {% include "sub/edit.html.j2" %}
   {% endwith %}
   <br />

@@ -220,22 +220,13 @@ def things(thing: str):
 #     return redirect(f"/{thing}")
 
 
-# @app.route("/delete/<string:thing>", methods=["POST"])
-# def delete(thing: str):
-#     """Remove item from table"""
-#     ipaddr = get_ip(request)
-#     table = get_table(thing)
-
-#     form = request.form
-#     uid = int(form["uid"])
-#     name = form["name"].strip()
-#     val = table.get(doc_id=uid)
-
-#     if val["name"] == name:
-#         table.remove(doc_ids=[uid])
-#         logging.info("DELETE\t%s - %s %s - %s", ipaddr, thing, uid, name)
-
-#     return redirect(f"/{thing}")
+@app.route("/delete/<string:thing>", methods=["POST"])
+def delete(thing: str):
+    """Remove item from table"""
+    ipaddr = get_ip(request)
+    get_db().delete(request.form, thing)
+    logging.info("DELETE\t%s - %s", ipaddr, thing)
+    return redirect(f"/list/{thing}")
 
 
 def get_db():

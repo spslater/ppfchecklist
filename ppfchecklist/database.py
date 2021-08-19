@@ -331,7 +331,7 @@ class DatabaseSqlite3(Database):
                 JOIN Status
                     ON Status.rowid = Entry.status
                     AND Status.rowid = ?
-                WHERE Entry.position <= ?
+                WHERE Entry.position > ?
             )
             """,
             (table_id, status_id, position),
@@ -343,7 +343,7 @@ class DatabaseSqlite3(Database):
         orderByPosition = status["orderByPosition"]
         table_id = self._execute(
                 "SELECT rowid FROM List WHERE name = ?",
-                (table,)
+                (table,),
             )[0]["rowid"]
         name = form["name"].strip()
         date = None
@@ -382,5 +382,31 @@ class DatabaseSqlite3(Database):
             INSERT INTO Entry
             VALUES (?,?,?,?,?)
             """,
-            (name, position, date, status_id, table_id)
+            (name, position, date, status_id, table_id),
         )
+
+    def delete(self, form, table):
+        rowid = int(form["rowid"])
+        name = form["name"].strip()
+
+        print("getting value")
+        value = self._execute(
+            """SELECT
+                Entry.name as name,
+                Entry.position as position,
+                Status.orderByPosition as orderByPosition,
+                List.rowid as table_id,
+                Status.rowid as status_id
+            FROM Entry
+            JOIN List ON List.rowid = Entry.list
+            JOIN Status ON Status.rowid = Entry.status
+            WHERE Entry.rowid = ?
+            """,
+            (rowid,),
+        )[0]
+
+        if value["name"] == name:
+            print("decrementing value")
+            self._decrament(value["table_id"], value["status_id"], value["position"])
+            print("deleteing value")
+            self._execute("DELETE FROM Entry WHERE rowid = ?", (rowid,))
