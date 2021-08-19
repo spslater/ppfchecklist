@@ -1,6 +1,6 @@
 """Database for the lists"""
-import sqlite3
 import logging
+import sqlite3
 from abc import ABC, abstractmethod
 from json import dumps, load
 from os import getenv
@@ -227,7 +227,9 @@ class DatabaseSqlite3(Database):
         return {
             "Status": [dict(v) for v in self._execute("SELECT rowid, * FROM Status")],
             "List": [dict(v) for v in self._execute("SELECT rowid, * FROM List")],
-            "ListStatus": [dict(v) for v in self._execute("SELECT rowid, * FROM ListStatus")],
+            "ListStatus": [
+                dict(v) for v in self._execute("SELECT rowid, * FROM ListStatus")
+            ],
             "Entry": [dict(v) for v in self._execute("SELECT rowid, * FROM Entry")],
         }
 
@@ -244,10 +246,7 @@ class DatabaseSqlite3(Database):
         FROM List
         WHERE {"rowid" if isinstance(table, int) else "name"} = ?
         ORDER BY position ASC"""
-        return self._execute(
-            sql,
-            (table,)
-        )[0]
+        return self._execute(sql, (table,))[0]
 
     def status(self, table: str):
         return self._execute(
@@ -420,7 +419,9 @@ class DatabaseSqlite3(Database):
         position = None
 
         if orderByPosition:
-            position, max_pos = self._calc_position(table_id, status_id, form["position"])
+            position, max_pos = self._calc_position(
+                table_id, status_id, form["position"]
+            )
             if position <= max_pos:
                 self._increment(table_id, status_id, position)
         else:
@@ -465,16 +466,21 @@ class DatabaseSqlite3(Database):
             return goto
 
         if old_table != new_table or old_status != new_status:
-            self.insert({
-                "position": new_pos,
-                "name": new_name,
-                "status": new_status["rowid"],
-                "date": new_date
-            }, new_table["name"])
-            self.delete({
+            self.insert(
+                {
+                    "position": new_pos,
+                    "name": new_name,
+                    "status": new_status["rowid"],
+                    "date": new_date,
+                },
+                new_table["name"],
+            )
+            self.delete(
+                {
                     "rowid": rowid,
                     "name": old_name,
-            })
+                }
+            )
             return goto
 
         status_id = new_status["rowid"]
@@ -487,18 +493,14 @@ class DatabaseSqlite3(Database):
             self._increment_range(table_id, status_id, new_pos, old_pos)
         elif old_pos < new_pos:
             self._decrement_range(table_id, status_id, new_pos, old_pos)
-        if (
-            old_pos != new_pos
-            or old_name != new_name
-            or old_date != new_date
-        ):
+        if old_pos != new_pos or old_name != new_name or old_date != new_date:
             self._execute(
                 """
                 UPDATE Entry
                 SET position = ?, name = ?, date = ?
                 WHERE rowid = ?
                 """,
-                (new_pos, new_name, new_date, rowid)
+                (new_pos, new_name, new_date, rowid),
             )
         return goto
 

@@ -8,7 +8,15 @@ from os.path import join
 from sys import maxsize, stdout
 
 from dotenv import load_dotenv
-from flask import Flask, g, redirect, render_template, request, send_from_directory, jsonify
+from flask import (
+    Flask,
+    g,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_from_directory,
+)
 from werkzeug.datastructures import ImmutableMultiDict
 
 from .database import DatabaseSqlite3
@@ -158,91 +166,63 @@ def get_db():
     return db
 
 
-def _main():
-    parser = ArgumentParser(
-        formatter_class=ArgumentDefaultsHelpFormatter,
-        add_help=False,
+port = getenv_int("PPF_PORT", 80)
+debug = getenv_bool("PPF_DEBUG", False)
+
+basedir = getenv("PPF_BASEDIR", ".")
+
+output_file = getenv("PPF_LOGFILE", None)
+if output_file and output_file[0] != "/":
+    output_file = join(basedir, output_file)
+
+handler_list = (
+    [logging.StreamHandler(stdout), logging.FileHandler(output_file)]
+    if output_file
+    else [logging.StreamHandler(stdout)]
+)
+
+loglevel = {
+    "CRITICAL": logging.CRITICAL,
+    "ERROR": logging.ERROR,
+    "WARNING": logging.WARNING,
+    "INFO": logging.INFO,
+    "DEBUG": logging.DEBUG,
+    "NOTSET": logging.NOTSET,
+}[getenv("PPF_LOGLEVEL", "INFO")]
+
+logging.basicConfig(
+    format="%(asctime)s\t[%(levelname)s]\t{%(module)s}\t%(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    level=loglevel,
+    handlers=handler_list,
+)
+
+if getenv_bool("PPF_AUTHORIZE", False):
+    logging.debug("Setting up authorizing via OpenID Connect")
+    from flask_oidc import OpenIDConnect
+
+    app.config.update(
+        {
+            "SECRET_KEY": getenv("SECRET_KEY", "SUPERSECRETKEYTELLNOONE"),
+            "TESTING": debug,
+            "DEBUG": debug,
+            "OIDC_CLIENT_SECRETS": getenv("OIDC_CLIENT_SECRETS"),
+            "OIDC_ID_TOKEN_COOKIE_SECURE": True,
+            "OIDC_REQUIRE_VERIFIED_EMAIL": False,
+            "OIDC_USER_INFO_ENABLED": True,
+            "OIDC_VALID_ISSUERS": getenv("OIDC_VALID_ISSUERS"),
+            "OIDC_OPENID_REALM": getenv("OIDC_OPENID_REALM"),
+            "OIDC_SCOPES": "openid",
+            "OIDC_INTROSPECTION_AUTH_METHOD": "client_secret_post",
+        }
     )
+    oidc = OpenIDConnect()
+    oidc.init_app(app)
 
-    parser.add_argument("--help", action="help", help="show this help message and exit")
+    index = oidc.require_login(index)
+    things = oidc.require_login(things)
+    update = oidc.require_login(update)
+    move = oidc.require_login(move)
+    delete = oidc.require_login(delete)
 
-    parser.add_argument(
-        "-e",
-        "--env",
-        dest="env",
-        default=".env",
-        help="File to load with environment settings",
-        metavar="ENV",
-    )
-
-    args = parser.parse_args()
-
-    try:
-        load_dotenv(args.env, override=True)
-    except IOError:
-        logging.debug("No dotenv file found.")
-
-    port = getenv_int("PPF_PORT", 80)
-    debug = getenv_bool("PPF_DEBUG", False)
-
-    basedir = getenv("PPF_BASEDIR", ".")
-
-    output_file = getenv("PPF_LOGFILE", None)
-    if output_file and output_file[0] != "/":
-        output_file = join(basedir, output_file)
-
-    handler_list = (
-        [logging.StreamHandler(stdout), logging.FileHandler(output_file)]
-        if output_file
-        else [logging.StreamHandler(stdout)]
-    )
-
-    loglevel = {
-        "CRITICAL": logging.CRITICAL,
-        "ERROR": logging.ERROR,
-        "WARNING": logging.WARNING,
-        "INFO": logging.INFO,
-        "DEBUG": logging.DEBUG,
-        "NOTSET": logging.NOTSET,
-    }[getenv("PPF_LOGLEVEL", "INFO")]
-
-    logging.basicConfig(
-        format="%(asctime)s\t[%(levelname)s]\t{%(module)s}\t%(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        level=loglevel,
-        handlers=handler_list,
-    )
-
-    # if getenv_bool("PPF_AUTHORIZE", False):
-    #     logging.debug("Setting up authorizing via OpenID Connect")
-    #     from flask_oidc import OpenIDConnect
-
-    #     app.config.update(
-    #         {
-    #             "SECRET_KEY": getenv("SECRET_KEY", "SUPERSECRETKEYTELLNOONE"),
-    #             "TESTING": debug,
-    #             "DEBUG": debug,
-    #             "OIDC_CLIENT_SECRETS": getenv("OIDC_CLIENT_SECRETS"),
-    #             "OIDC_ID_TOKEN_COOKIE_SECURE": True,
-    #             "OIDC_REQUIRE_VERIFIED_EMAIL": False,
-    #             "OIDC_USER_INFO_ENABLED": True,
-    #             "OIDC_VALID_ISSUERS": getenv("OIDC_VALID_ISSUERS"),
-    #             "OIDC_OPENID_REALM": getenv("OIDC_OPENID_REALM"),
-    #             "OIDC_SCOPES": "openid",
-    #             "OIDC_INTROSPECTION_AUTH_METHOD": "client_secret_post",
-    #         }
-    #     )
-    #     oidc = OpenIDConnect()
-    #     oidc.init_app(app)
-
-    #     index = oidc.require_login(index)
-    #     things = oidc.require_login(things)
-    #     update = oidc.require_login(update)
-    #     move = oidc.require_login(move)
-    #     delete = oidc.require_login(delete)
-
-    app.run(host="0.0.0.0", port=port, debug=debug)
-
-
-if __name__ == "__main__":
-    _main()
+app.run(host="0.0.0.0", port=port, debug=debug)

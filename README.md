@@ -6,38 +6,16 @@ This flask app is a reading list to help keep track of comic books to read.
 pip install -r requirements.txt
 ```
 
-### Why TinyDB?
-[TinyDB's Documentation](https://tinydb.readthedocs.io/en/latest/intro.html#why-not-use-tinydb)
-says not to use it for an HTTP server. Flask is an HTTP server, so why is it being used?
-
-It boils down to this is not designed to be a scalable app used by a lot of people at once.
-I prioritize the ability to easily read an modify the database by hand over the drawbacks.
-The design of the database makes it easy to port to something like SQLite or MongoDB in the future
-if I ever decide that the drawbacks start to outweigh using something like SQLite / MongoDB.
-(I would probably lean towards SQLite becuase it's also a local database which I prefer.)
+## Upgrade
+Upgrading from the previous TinyDB version of PPF Checklist just requires going to the `/upload` endpoint and selecting the old database. The tables will be in alphabetical order instead of the order assigned previously.
 
 ## Usage
-```
-usage: ppfchecklist.py [--help] [-e ENV]
+```py -m flask run``
 
-optional arguments:
-  --help             show this help message and exit
-  -e ENV, --env ENV  File to load with environment settings (default: .env)
-```
+PPF Checklist loads it's settings from environment variables set. It defaults to using for a
+`.flaskenv` and `.env` file
 
-PPF Checklist loads it's settings from environment variables set. It defaults to looking for a
-`.env` file but a specific file can be passed in with the `--env` flag. If that file can't be
-found, the program will work with the values already set in the system environment.
-
-See `.env.sample` for values that will be loaded from the environment and their defaults.
-
-### list.db
-TinyDB database where each entry has the comic `name`, `position`, and `date` completed in the `comics` table.
-See `list.db.sample` for an example TinyDB database.
-
-### tables.json
-`tables.json` is a list of names for the different things you want to track.
-See `tables.json.sample` for an example file.
+See `.flaskenv.sample` for values that will be loaded from the environment and their defaults.
 
 ## Endpoints
 Done items are displayed below the list, with dates completed next to it.
