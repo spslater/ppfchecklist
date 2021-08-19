@@ -1,15 +1,15 @@
 {% block head %}
-	{% with typeList="Everything" %}
-		{% include "sub/head.html.j2" %}
-	{% endwith %}
+  {% with typeList="Everything" %}
+    {% include "sub/head.html.j2" %}
+  {% endwith %}
 {% endblock %}
 
 {% block body %}
-	{% for t in things %}
-	<div>
-		{% with thing=t.thing, done=t.done, todo=t.todo, tbls=tbls, autofocus=False %}
-			{% include "sub/thing.html.j2" %}
-		{% endwith %}
-	</div>
-	{% endfor %}
+  {% for t in things %}
+  <div>
+    {% with thing=t.thing, status=t.status, done=t.done, todo=t.todo, tbls=tbls, autofocus=False %}
+      {% include "sub/thing.html.j2" %}
+    {% endwith %}
+  </div>
+  {% endfor %}
 {% endblock %}

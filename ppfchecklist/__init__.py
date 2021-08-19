@@ -91,7 +91,14 @@ def index():
     things_list = []
     for tbl in tables:
         todo, done = db.info(tbl)
-        things_list.append({"thing": tbl, "todo": todo, "done": done})
+        things_list.append(
+            {
+                "thing": tbl,
+                "todo": todo,
+                "done": done,
+                "status": db.status(tbl),
+            }
+        )
 
     return render_template("index.html.j2", things=things_list, tbls=tables)
 
@@ -151,11 +158,17 @@ def things(thing: str):
 
         todo, done = db.info(thing)
         return render_template(
-            "things.html.j2", thing=thing, todo=todo, done=done, tbls=db.tables()
+            "things.html.j2",
+            thing=thing,
+            todo=todo,
+            done=done,
+            tbls=db.tables(),
+            status=db.status(thing),
         )
-    # # request.method == "POST"
+    # request.method == "POST"
     # doc = generate_document(request.form, table)
     # insert_new_thing(doc, table, thing, ipaddr)
+    db.insert(request.form, thing)
     return redirect(f"/list/{thing}")
 
 
@@ -274,7 +287,6 @@ def things(thing: str):
 
 def get_db():
     db = getattr(g, "_database", None)
-    print("getting db", db)
     if db is None:
         db = g._database = DatabaseSqlite3(getenv("PPF_BASEDIR", "."))
     return db

@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from json import dumps, load
 from os import getenv
 from os.path import join
+from sys import maxsize
 
 
 class TableNotFoundError(Exception):
@@ -28,7 +29,7 @@ class Database(ABC):
     def delete(self, form: dict):
         raise NotImplementedError
 
-    # @abstractmethod
+    @abstractmethod
     def insert(self, form: dict):
         raise NotImplementedError
 
@@ -61,21 +62,21 @@ class DatabaseSqlite3(Database):
             self._execute(
                 """CREATE TABLE Status (
                     name TEXT UNIQUE,
-                    position INT,
                     orderByPosition INT
                 )"""
             )
             self._executemany(
-                "INSERT INTO Status VALUES (?, ?, ?)",
+                "INSERT INTO Status VALUES (?, ?)",
                 [
-                    ("todo", 2, True),
-                    ("done", 3, False),
-                    ("drop", 4, False),
-                    ("prog", 1, True),
+                    ("In Progress", True),
+                    ("Planned", True),
+                    ("Done", False),
+                    ("Dropped", False),
                 ],
             )
         except sqlite3.OperationalError as e:
-            logging.debug(e)
+            if "already exists" not in str(e):
+                logging.debug(e)
 
         try:
             self._execute(
@@ -86,14 +87,42 @@ class DatabaseSqlite3(Database):
                 )"""
             )
         except sqlite3.OperationalError as e:
-            logging.debug(e)
+            if "already exists" not in str(e):
+                logging.debug(e)
+
+        try:
+            self._execute(
+                """CREATE TABLE ListStatus (
+                    list INT,
+                    status INT,
+                    position INT,
+                    FOREIGN KEY (list) REFERENCES List(rowid),
+                    FOREIGN KEY (status) REFERENCES Status(rowid),
+                    UNIQUE (list, status)
+                )"""
+            )
+        except sqlite3.OperationalError as e:
+            if "already exists" not in str(e):
+                logging.debug(e)
+
+        tables = self._execute("SELECT rowid FROM List")
+        statuses = self._execute("SELECT rowid FROM Status")
+        for table in tables:
+            for status in statuses:
+                try:
+                    self._execute(
+                        "INSERT INTO ListStatus VALUES (?,?,?)",
+                        (table["rowid"], status["rowid"], status["rowid"]),
+                    )
+                except sqlite3.IntegrityError as e:
+                    pass
 
         try:
             self._execute(
                 """CREATE TABLE Entry (
+                    name TEXT NOT NULL,
                     position INTEGER,
                     date TEXT,
-                    name TEXT NOT NULL,
                     status INT,
                     list INT,
                     FOREIGN KEY (status) REFERENCES Status(rowid),
@@ -102,7 +131,8 @@ class DatabaseSqlite3(Database):
                 )"""
             )
         except sqlite3.OperationalError as e:
-            logging.debug(e)
+            if "already exists" not in str(e):
+                logging.debug(e)
 
     def close(self):
         self.connection.close()
@@ -125,9 +155,12 @@ class DatabaseSqlite3(Database):
         return result
 
     def import_json(self, filename: str):
+        logging.debug("Dropping tables")
         self._execute("DROP TABLE Entry")
+        self._execute("DROP TABLE ListStatus")
         self._execute("DROP TABLE List")
         self._execute("DROP TABLE Status")
+        logging.debug("Loading tables again")
         self._init_database()
 
         with open(filename, "r") as fp:
@@ -140,9 +173,21 @@ class DatabaseSqlite3(Database):
 
             try:
                 table_id, _ = self._execute(
-                    "INSERT INTO List VALUES (?,?,?)", (table, tbl_pos, True), True
+                    "INSERT INTO List VALUES (?,?,?)",
+                    (table, tbl_pos, True),
+                    True,
                 )
                 tbl_pos += 1
+
+                statuses = self._execute("SELECT rowid FROM Status")
+                for status in statuses:
+                    try:
+                        self._execute(
+                            "INSERT INTO ListStatus VALUES (?,?,?)",
+                            (table_id, status["rowid"], status["rowid"]),
+                        )
+                    except sqlite3.IntegrityError as e:
+                        pass
             except sqlite3.IntegrityError:
                 result = self._execute(
                     "SELECT rowid FROM List WHERE name = ?", (table,)
@@ -156,23 +201,23 @@ class DatabaseSqlite3(Database):
                 status = None
                 if position > 0:
                     result = self._execute(
-                        "SELECT rowid FROM Status WHERE name = 'todo'"
+                        "SELECT rowid FROM Status WHERE name = 'Planned'"
                     )
                     status = result[0]["rowid"]
                 elif position == 0:
                     result = self._execute(
-                        "SELECT rowid FROM Status WHERE name = 'done'"
+                        "SELECT rowid FROM Status WHERE name = 'Done'"
                     )
                     status = result[0]["rowid"]
                 elif position < 0:
                     result = self._execute(
-                        "SELECT rowid FROM Status WHERE name = 'drop'"
+                        "SELECT rowid FROM Status WHERE name = 'Dropped'"
                     )
                     status = result[0]["rowid"]
                 try:
                     self._execute(
                         "INSERT INTO Entry VALUES (?, ?, ?, ?, ?)",
-                        (position, date, name, status, table_id),
+                        (name, position, date, status, table_id),
                     )
                 except sqlite3.IntegrityError:
                     pass
@@ -181,6 +226,7 @@ class DatabaseSqlite3(Database):
         return (
             [tuple(v) for v in self._execute("SELECT rowid, * FROM Status")],
             [tuple(v) for v in self._execute("SELECT rowid, * FROM List")],
+            [tuple(v) for v in self._execute("SELECT rowid, * FROM ListStatus")],
             [tuple(v) for v in self._execute("SELECT rowid, * FROM Entry")],
         )
 
@@ -193,6 +239,25 @@ class DatabaseSqlite3(Database):
         )
         return [r["name"] for r in rows]
 
+    def status(self, table: str):
+        return self._execute(
+            """
+            SELECT 
+                Status.rowid as rowid,
+                Status.name as name,
+                ListStatus.position as position,
+                Status.orderByPosition as orderByPosition
+            FROM Status
+            JOIN ListStatus
+                ON Status.rowid = ListStatus.status
+            JOIN List 
+                ON List.rowid = ListStatus.list
+                AND List.name = ?
+            ORDER BY position
+            """,
+            (table,),
+        )
+
     def info(self, table: str):
         todo = self._execute(
             """
@@ -202,11 +267,11 @@ class DatabaseSqlite3(Database):
                 AND List.name = ?
             JOIN Status
                 ON Status.rowid = Entry.status
-                AND Status.name = 'todo'
+                AND Status.name = 'Planned'
             ORDER BY
                 CASE 
                     WHEN Status.orderByPosition == 1 THEN Entry.position
-                    WHEN Status.orderByPosition == 0 THEN Entry.date 
+                    WHEN Status.orderByPosition == 0 THEN Entry.date
                 END ASC
             """,
             (table,),
@@ -220,7 +285,7 @@ class DatabaseSqlite3(Database):
                 AND List.name = ?
             JOIN Status
                 ON Status.rowid = Entry.status
-                AND Status.name = 'done'
+                AND Status.name = 'Done'
             ORDER BY
                 CASE 
                     WHEN Status.orderByPosition == 1 THEN Entry.position
@@ -231,3 +296,82 @@ class DatabaseSqlite3(Database):
         )
 
         return todo, done
+
+    def insert(self, form, table):
+        status = [s for s in self.status(table) if s["rowid"] == form["rowid"]][0]
+        status_id = status["rowid"]
+        orderByPosition = status["orderByPosition"]
+        table_id = self._execute(
+                "SELECT rowid FROM Table WHERE name = ?",
+                (table,)
+            )[0]["rowid"]
+        name = form["name"].strip()
+        date = None
+        position = None
+
+        if orderByPosition:
+            # max_pos = max([int(a["position"]) for a in table]) if len(table) else 0
+            try:
+                max_pos = self._execute(
+                    """
+                    SELECT MAX(position)
+                    FROM Entry
+                    JOIN List
+                        ON List.rowid = Entry.list
+                        AND List.rowid = ?
+                    JOIN Status
+                        ON Status.rowid = Entry.status
+                        AND Status.rowid = ?
+                    """,
+                    (table_id, status_id),
+                )[0]
+            except IndexError:
+                max_pos = 0
+            pos = max(1, int(form["position"] if form["position"] != "" else maxsize))
+            position = pos if (pos <= max_pos) else (max_pos + 1)
+
+            # if position > 0:
+            #     table.update(increment("position"), where("position") >= doc["position"])
+            #     doc.pop("date", None)
+            #     uid = table.insert(doc)
+            if position <= max_pos:
+                # update existing fields to slot in middle of list
+                self._execute(
+                    """
+                    UPDATE Entry
+                    SET position = position + 1
+                    FROM Entry
+                        JOIN List
+                            ON List.rowid = Entry.list
+                            AND List.name = ?
+                        JOIN Status
+                            ON Status.rowid = Entry.status
+                            AND Status.rowid = ?
+                    WHERE position >= ?
+                    """,
+                    (table, status_id, position),
+                )
+        else:
+            # elif doc["position"] <= 0:
+            #     doc["position"] = 0
+            #     if not doc["date"]:
+            #         doc["date"] = datetime.now().strftime("%Y-%m-%d")
+            #     uid = table.insert(doc)
+            if form.get("date", "") == "":
+                date = datetime.now().strftime("%Y-%m-%d")
+            else:
+                date = form["date"]
+
+        # name TEXT NOT NULL,
+        # position INTEGER,
+        # date TEXT,
+        # status INT,
+        # list INT,
+        self._execute(
+            """
+            INSERT INTO Entry
+            VALUES (?,?,?,?,?)
+            """,
+            (name, position, date, status_id, table_id)
+        )
+        # return uid
