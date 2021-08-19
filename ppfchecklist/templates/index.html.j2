@@ -1,0 +1,15 @@
+{% block head %}
+  {% with typeList="Everything" %}
+    {% include "sub/head.html.j2" %}
+  {% endwith %}
+{% endblock %}
+
+{% block body %}
+  {% for t in things %}
+  <div>
+    {% with thing=t.thing, status=t.status, results=t.results, tbls=tbls, autofocus=False %}
+      {% include "sub/thing.html.j2" %}
+    {% endwith %}
+  </div>
+  {% endfor %}
+{% endblock %}

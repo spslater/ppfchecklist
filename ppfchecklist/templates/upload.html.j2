@@ -1,0 +1,13 @@
+{% block head %}
+  {% with typeList="Upload" %}
+    {% include "sub/head.html.j2" %}
+  {% endwith %}
+{% endblock %}
+
+{% block body %}
+  <h2>Upload</h2>
+  <form action="/upload" method="POST" enctype=multipart/form-data>
+      <input type="file" id="filename" name="filename">
+      <input type="submit" value="Upload">
+  </form>
+{% endblock %}

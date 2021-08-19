@@ -1,0 +1,23 @@
+{% with header=thing.name|title %}
+  {% include "sub/header.html.j2" %}
+{% endwith %}
+
+{% with type=thing.name, status=status, autofocus=autofocus %}
+  {% include "sub/form.html.j2" %}
+{% endwith %}
+
+{% for result in results %}
+  {% set title = result.status %}
+  {% set rows = result.rows %}
+  {% if result["orderByPosition"] %}
+    {% with title=title, todo=rows, type=thing, tbls=tbls %}
+      {% include "sub/position_list.html.j2" %}
+    {% endwith %}
+  {% else %}
+    {% with title=title, done=rows, type=thing, tbls=tbls %}
+      {% include "sub/date_list.html.j2" %}
+    {% endwith %}
+  {% endif %}
+{% endfor %}
+
+

@@ -1,0 +1,12 @@
+{% block head %}
+  {% with typeList=thing.name|title %}
+    {% include "sub/head.html.j2" %}
+  {% endwith %}
+{% endblock %}
+
+{% block body %}
+  <div style="float:right"><a href="/">Home</a></div>
+  {% with thing=thing, results=results, tbls=tbls, status=status, autofocus=True %}
+    {% include "sub/thing.html.j2" %}
+  {% endwith %}
+{% endblock %}
