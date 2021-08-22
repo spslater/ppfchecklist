@@ -105,7 +105,7 @@ def index():
     things_list = []
     for table in tables:
         tbl = table["name"]
-        results = db.info(tbl)
+        results = db.info(tbl, limit=10)
         things_list.append(
             {
                 "thing": table,
