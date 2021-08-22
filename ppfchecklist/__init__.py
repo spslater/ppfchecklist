@@ -158,6 +158,14 @@ def delete(thing: str):
     logging.info("DELETE\t%s - %s", ipaddr, thing)
     return redirect(f"/list/{thing}")
 
+@app.route("/settings", methods=["GET", "POST"])
+def settings():
+    db = get_db()
+    if request.method == "GET":
+        settings = db.get_settings()
+        return render_template("settings.html.j2", settings=settings)
+    res = db.set_settings(request.form)
+    return redirect("/")
 
 def get_db():
     db = getattr(g, "_database", None)
