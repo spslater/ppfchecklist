@@ -1,0 +1,183 @@
+{% block head %}
+  {% with title="Settings" %}
+    {% include "sub/head.html.j2" %}
+  {% endwith %}
+  <!-- https://github.com/isocra/TableDnD -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/TableDnD/0.9.1/jquery.tablednd.js" integrity="sha256-d3rtug+Hg1GZPB7Y/yTcRixO/wlI78+2m08tosoRn7A=" crossorigin="anonymous"></script>
+  <script defer>
+    var statusNumber = {{settings.statuses|length}} + 1;
+    var tableNumber = {{settings.tables|length}} + 1;
+  </script>
+  <script type="text/javascript" src="{{ url_for('static', filename='settings.js') }}" defer></script>
+  <style>
+    .dragclass {
+      color: orange;
+      background: red;
+    }
+    tr {
+      text-align:center;
+    }
+  </style>
+{% endblock %}
+
+{% block body %}
+  <h2>Settings</h2>
+  <div class="container-fluid">
+    <form action="/settings" method="POST">
+      <table id="statuses" class="table">
+        <thead>
+          <tr>
+            <th class="col-1">Move</th>
+            <th class="col-1">Position</th>
+            <th class="col-8">Name</th>
+            <th class="col-2">Order by Position</th>
+          <tr>
+        </thead>
+        <tbody>
+          {% for status in settings.statuses %}
+            <tr id="status_{{status.rowid}}">
+              <td>⇅</td>
+              <td>
+                <p>{{status.position}}</p>
+                <input
+                  class="form-control"
+                  type="hidden"
+                  id="status_{{status.rowid}}_position"
+                  name="status_{{status.rowid}}_position"
+                  value="{{status.position}}"
+                />
+                <input
+                  class="form-control"
+                  type="hidden"
+                  id="status_{{status.rowid}}_og_position"
+                  name="status_{{status.rowid}}_og_position"
+                  value="{{status.position}}"
+                  hidden
+                />
+              </td>
+              <td>
+                <input
+                  class="form-control"
+                  type="text"
+                  id="status_{{status.rowid}}_name"
+                  name="status_{{status.rowid}}_name"
+                  placeholder="{{status.name}}"
+                  value="{{status.name}}"
+                />
+                <input
+                  class="form-control"
+                  type="text"
+                  id="status_{{status.rowid}}_og_name"
+                  name="status_{{status.rowid}}_og_name"
+                  value="{{status.name}}"
+                  hidden
+                />
+              </td>
+              <td>
+                {% if status.orderByPosition %}✓{% else %}☓{% endif %}
+                <input
+                  class="form-control"
+                  type="checkbox"
+                  name="status_{{status.rowid}}_orderByPosition"
+                  id="status_{{status.rowid}}_orderByPosition"
+                  {% if status.orderByPosition %}checked{% endif %}
+                  hidden
+                />
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <input type="hidden" id="statusOrder" name="statusOrder" />
+      <div class="form-row">
+        <div class="form-group col-3 col-sm-2 col-md-3">
+          <button id="newstatus" type="button" class="btn btn-primary btn-block">New Status</button>
+        </div>
+      </div>
+      <br />
+      <table id="tables" class="table">
+        <thead>
+          <tr>
+            <th class="col-1">Move</th>
+            <th class="col-1">Position</th>
+            <th class="col-8">Name</th>
+            <th class="col-2">Active</th>
+          <tr>
+        </thead>
+        <tbody>
+          {% for table in settings.tables %}
+            <tr id="table_{{table.rowid}}">
+              <td>⇅</td>
+              <td>
+                <p>{{table.position}}</p>
+                <input
+                  class="form-control"
+                  type="hidden"
+                  id="table_{{table.rowid}}_position"
+                  name="table_{{table.rowid}}_position"
+                  value="{{table.position}}"
+                />
+                <input
+                  class="form-control"
+                  type="hidden"
+                  id="table_{{table.rowid}}_og_position"
+                  name="table_{{table.rowid}}_og_position"
+                  value="{{table.position}}"
+                />
+              </td>
+              <td>
+                <input
+                  class="form-control"
+                  type="text"
+                  id="table_{{table.rowid}}_name"
+                  name="table_{{table.rowid}}_name"
+                  placeholder="{{table.name}}"
+                  value="{{table.name}}"
+                />
+                <input
+                  class="form-control"
+                  type="text"
+                  id="table_{{table.rowid}}_og_name"
+                  name="table_{{table.rowid}}_og_name"
+                  value="{{table.name}}"
+                  hidden
+                />
+              </td>
+              <td>
+                <input
+                  class="form-control"
+                  type="checkbox"
+                  name="table_{{table.rowid}}_active"
+                  id="table_{{table.rowid}}_active"
+                  {% if table.active %}checked{% endif %}
+                />
+                <input
+                  class="form-control"
+                  type="checkbox"
+                  name="table_{{table.rowid}}_og_active"
+                  id="table_{{table.rowid}}_og_active"
+                  {% if table.active %}checked{% endif %}
+                  hidden
+                />
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <input type="hidden" id="tableOrder" name="tableOrder" />
+      <div class="form-row">
+        <div class="form-group col-3 col-sm-2 col-md-3">
+          <button id="newtable" type="button" class="btn btn-primary btn-block">New Table</button>
+        </div>
+      </div>
+      <hr>
+      <input type="hidden" id="numStatuses" name="numStatuses" value="{{settings.statuses|length}}" />
+      <input type="hidden" id="numTables" name="numTables" value="{{settings.tables|length}}" />
+      <div class="form-row justify-content-end">
+        <div class="form-group col-3">
+          <button type="submit" class="btn btn-primary btn-block">Update</button>
+        </div>
+      </div>
+    </form>
+  </div>
+{% endblock %}

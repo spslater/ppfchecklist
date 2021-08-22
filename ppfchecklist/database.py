@@ -2,6 +2,7 @@
 import logging
 import sqlite3
 from abc import ABC, abstractmethod
+from more_itertools import partition
 from json import dumps, load
 from os import getenv
 from os.path import join
@@ -62,19 +63,20 @@ class DatabaseSqlite3(Database):
         try:
             self._execute(
                 """CREATE TABLE Status (
-                    name TEXT UNIQUE,
+                    name TEXT,
+                    position INT,
                     orderByPosition INT
                 )"""
             )
-            self._executemany(
-                "INSERT INTO Status VALUES (?, ?)",
-                [
-                    ("In Progress", True),
-                    ("Planned", True),
-                    ("Done", False),
-                    ("Dropped", False),
-                ],
-            )
+            # self._executemany(
+            #     "INSERT INTO Status VALUES (?,?,?)",
+            #     [
+            #         ("In Progress", 1, True),
+            #         ("Planned", 2, True),
+            #         ("Done", 3, False),
+            #         ("Dropped", 4, False),
+            #     ],
+            # )
         except sqlite3.OperationalError as e:
             if "already exists" not in str(e):
                 logging.debug(e)
@@ -82,8 +84,8 @@ class DatabaseSqlite3(Database):
         try:
             self._execute(
                 """CREATE TABLE List (
-                    name TEXT UNIQUE,
-                    position INT UNIQUE,
+                    name TEXT,
+                    position INT,
                     active INT
                 )"""
             )
@@ -96,7 +98,6 @@ class DatabaseSqlite3(Database):
                 """CREATE TABLE ListStatus (
                     list INT,
                     status INT,
-                    position INT,
                     FOREIGN KEY (list) REFERENCES List(rowid),
                     FOREIGN KEY (status) REFERENCES Status(rowid),
                     UNIQUE (list, status)
@@ -106,17 +107,17 @@ class DatabaseSqlite3(Database):
             if "already exists" not in str(e):
                 logging.debug(e)
 
-        tables = self._execute("SELECT rowid FROM List")
-        statuses = self._execute("SELECT rowid FROM Status")
-        for table in tables:
-            for status in statuses:
-                try:
-                    self._execute(
-                        "INSERT INTO ListStatus VALUES (?,?,?)",
-                        (table["rowid"], status["rowid"], status["rowid"]),
-                    )
-                except sqlite3.IntegrityError as e:
-                    pass
+        # tables = self._execute("SELECT rowid FROM List")
+        # statuses = self._execute("SELECT rowid FROM Status")
+        # for table in tables:
+        #     for status in statuses:
+        #         try:
+        #             self._execute(
+        #                 "INSERT INTO ListStatus VALUES (?,?,?)",
+        #                 (table["rowid"], status["rowid"], status["rowid"]),
+        #             )
+        #         except sqlite3.IntegrityError as e:
+        #             pass
 
         try:
             self._execute(
@@ -135,35 +136,31 @@ class DatabaseSqlite3(Database):
             if "already exists" not in str(e):
                 logging.debug(e)
 
-    def close(self):
-        self.connection.close()
-
-    def _cursor(self):
-        return self.connection.cursor()
-
-    def _execute(self, sql: str, parameters: tuple = None, rowid: bool = False):
-        cur = self._cursor()
-        cur.execute(sql, parameters) if parameters else cur.execute(sql)
-        result = (cur.lastrowid, cur.fetchall()) if rowid else cur.fetchall()
-        self.connection.commit()
-        return result
-
-    def _executemany(self, sql: str, parameters: tuple = None):
-        cur = self._cursor()
-        cur.executemany(sql, parameters) if parameters else cur.executemany(sql)
-        result = cur.fetchall()
-        self.connection.commit()
-        return result
-
-    def upload(self, data):
+    def _drop_database(self):
         logging.debug("Dropping tables")
         self._execute("DROP TABLE Entry")
         self._execute("DROP TABLE ListStatus")
         self._execute("DROP TABLE List")
         self._execute("DROP TABLE Status")
-        logging.debug("Loading tables again")
-        self._init_database()
 
+    def close(self):
+        self.connection.close()
+
+    def _execute(self, sql: str, parameters: tuple = None, rowid: bool = False):
+        if parameters is None:
+            parameters = tuple()
+        cur = self.connection.execute(sql, parameters)
+        self.connection.commit()
+        return (cur.lastrowid, cur.fetchall()) if rowid else cur.fetchall()
+
+    def _executemany(self, sql: str, parameters: list[tuple] = None):
+        if parameters is None:
+            parameters = []
+        result = self.connection.executemany(sql, parameters).fetchall()
+        self.connection.commit()
+        return result
+
+    def _upload_oldstyle(self, data):
         tbl_pos = 1
         for table, values in data.items():
             if table == "_default":
@@ -181,8 +178,8 @@ class DatabaseSqlite3(Database):
                 for status in statuses:
                     try:
                         self._execute(
-                            "INSERT INTO ListStatus VALUES (?,?,?)",
-                            (table_id, status["rowid"], status["rowid"]),
+                            "INSERT INTO ListStatus VALUES (?,?)",
+                            (table_id, status["rowid"]),
                         )
                     except sqlite3.IntegrityError as e:
                         pass
@@ -223,8 +220,62 @@ class DatabaseSqlite3(Database):
                 except sqlite3.IntegrityError:
                     pass
 
+    def _upload_newstyle(self, data):
+        status = data["Status"]
+        table = data["List"]
+        listStatus = data["ListStatus"]
+        entry = data["Entry"]
+
+        status = [(s["rowid"], s["name"], s["rowid"], s["orderByPosition"]) for s in status]
+        table = [(t["rowid"], t["name"], t["position"], t["active"]) for t in table]
+        listStatus = [(l["rowid"], l["list"], l["status"]) for l in listStatus]
+        entry = [(e["rowid"], e["name"], e["position"], e["date"], e["status"], e["list"]) for e in entry]
+
+        self._executemany(
+            """
+            INSERT INTO Status(rowid, name, position, orderByPosition)
+            VALUES (?,?,?,?)
+            """,
+            status,
+        )
+
+        self._executemany(
+            """
+            INSERT INTO List(rowid, name, position, active)
+            VALUES (?,?,?,?)
+            """,
+            table
+        )
+
+        self._executemany(
+            """
+            INSERT INTO ListStatus(rowid, list, status)
+            VALUES (?,?,?)
+            """,
+            listStatus
+        )
+
+        self._executemany(
+            """
+            INSERT INTO Entry(rowid, name, position, date, status, list)
+            VALUES (?,?,?,?,?,?)
+            """,
+            entry
+        )
+
+    def upload(self, data):
+        self._drop_database()
+        logging.debug("Loading tables again")
+        self._init_database()
+
+        if data.get("sqlite", False):
+            self._upload_newstyle(data)
+        else:
+            self._upload_oldstyle(data)
+
     def download(self):
         return {
+            "sqlite": True,
             "Status": [dict(v) for v in self._execute("SELECT rowid, * FROM Status")],
             "List": [dict(v) for v in self._execute("SELECT rowid, * FROM List")],
             "ListStatus": [
@@ -251,20 +302,10 @@ class DatabaseSqlite3(Database):
     def status(self, table: str):
         return self._execute(
             """
-            SELECT 
-                Status.rowid as rowid,
-                Status.name as name,
-                ListStatus.position as position,
-                Status.orderByPosition as orderByPosition
+            SELECT rowid, *
             FROM Status
-            JOIN ListStatus
-                ON Status.rowid = ListStatus.status
-            JOIN List 
-                ON List.rowid = ListStatus.list
-                AND List.name = ?
             ORDER BY position
-            """,
-            (table,),
+            """
         )
 
     def info(self, table: str):
@@ -526,3 +567,155 @@ class DatabaseSqlite3(Database):
         if value["name"] == name:
             self._decrement(value["table_id"], value["status_id"], value["position"])
             self._execute("DELETE FROM Entry WHERE rowid = ?", (rowid,))
+
+    def get_settings(self):
+        statuses = self._execute("SELECT rowid, * FROM Status")
+        tables = self._execute("SELECT rowid, * FROM List")
+        enabledStatuses = self._execute(
+            """
+            SELECT
+                Status.position as position,
+                List.rowid as table_id,
+                Status.rowid as status_id,
+                Status.orderByPosition as orderByPosition
+            FROM ListStatus
+            JOIN List ON List.rowid = ListStatus.list
+            JOIN Status ON Status.rowid = ListStatus.status
+            """
+        )
+
+        statusList = []
+        for status in statuses:
+            statusList.append(dict(status))
+        print(statusList)
+        statusList = sorted(statusList, key=lambda i: i["position"])
+
+        tableDict = {}
+        for table in tables:
+            table = dict(table)
+            tableDict[table["rowid"]] = table
+
+        tableList = sorted(tableDict.values(), key=lambda i: i["position"])
+
+        return {
+            "statuses": statusList,
+            "tables": tableList,
+        }
+
+    def set_settings(self, form):
+        statusOrder = [int(o) for o in form["statusOrder"].split(",")]
+        tableOrder = [int(o) for o in form["tableOrder"].split(",")]
+        numStatuses = int(form["numStatuses"])
+        numTables = int(form["numTables"])
+
+        statuses = []
+        for idx, og in enumerate(statusOrder):
+            pre = f"status_{og}"
+            if form[f"{pre}_name"]:
+                statuses.append(
+                    {
+                        "rowid": og if og <= numStatuses else 0,
+                        "name": form[f"{pre}_name"],
+                        "orderByPosition": form.get(f"{pre}_orderByPosition") == "on",
+                        "og_name": form.get(f"{pre}_og_name", ""),
+                        "og_position": int(form.get(f"{pre}_og_position", 0)),
+                    }
+                )
+
+        for idx, status in enumerate(statuses):
+            status["position"] = idx + 1
+
+        statuses = [
+            s
+            for s in statuses
+            if s["name"] != s["og_name"] or s["position"] != s["og_position"]
+        ]
+
+        statusUpdate, statusInsert = partition(lambda i: i["rowid"] == 0, statuses)
+        statusUpdate = [(s["name"], s["position"], s["rowid"]) for s in statusUpdate]
+        statusInsert = [
+            (s["name"], s["position"], s["orderByPosition"]) for s in statusInsert
+        ]
+
+        print(statusUpdate)
+        if statusUpdate:
+            self._executemany(
+                """
+                UPDATE Status
+                SET name = ?, position = ?
+                WHERE rowid = ?
+                """,
+                statusUpdate,
+            )
+
+        print(statusInsert)
+        if statusInsert:
+            self._executemany(
+                """
+                INSERT INTO Status(name, position, orderByPosition)
+                VALUES (?, ?, ?)
+                """,
+                statusInsert,
+            )
+
+        tables = []
+        for idx, og in enumerate(tableOrder):
+            pre = f"table_{og}"
+
+            if form[f"{pre}_name"]:
+                tables.append(
+                    {
+                        "rowid": og if og <= numTables else 0,
+                        "name": form[f"{pre}_name"],
+                        "active": form.get(f"{pre}_active") == "on",
+                        "og_name": form.get(f"{pre}_name", ""),
+                        "og_position": int(form.get(f"{pre}_position", 0)),
+                    }
+                )
+
+        for idx, table in enumerate(tables):
+            table["position"] = idx + 1
+
+        tables = [
+            t
+            for t in tables
+            if t["name"] != t["og_name"] or t["position"] != t["og_position"]
+        ]
+
+        tableUpdate, tableInsert = partition(lambda i: i["rowid"] == 0, tables)
+        tableUpdate = [
+            (t["name"], t["position"], t["active"], t["rowid"]) for t in tableUpdate
+        ]
+        tableInsert = [(t["name"], t["position"], t["active"]) for t in tableInsert]
+
+        print(tableUpdate)
+        if tableUpdate:
+            self._executemany(
+                """
+                UPDATE List
+                SET name = ?, position = ?, active = ?
+                WHERE rowid = ?
+                """,
+                tableUpdate,
+            )
+
+        print(tableInsert)
+        if tableInsert:
+            self._executemany(
+                """
+                INSERT INTO List(name, position, active)
+                VALUES (?, ?, ?)
+                """,
+                tableInsert,
+            )
+
+        return {
+            "statuses": {
+                "update": statusUpdate,
+                "insert": statusInsert,
+            },
+            "tables": {
+                "update": tableUpdate,
+                "insert": tableInsert,
+            },
+        }

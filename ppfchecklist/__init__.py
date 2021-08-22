@@ -158,6 +158,14 @@ def delete(thing: str):
     logging.info("DELETE\t%s - %s", ipaddr, thing)
     return redirect(f"/list/{thing}")
 
+@app.route("/settings", methods=["GET", "POST"])
+def settings():
+    db = get_db()
+    if request.method == "GET":
+        settings = db.get_settings()
+        return render_template("settings.html.j2", settings=settings)
+    res = db.set_settings(request.form)
+    return redirect("/")
 
 def get_db():
     db = getattr(g, "_database", None)
@@ -220,9 +228,10 @@ if getenv_bool("PPF_AUTHORIZE", False):
     oidc.init_app(app)
 
     index = oidc.require_login(index)
+    dump = oidc.require_login(dump)
+    upload = oidc.require_login(upload)
     things = oidc.require_login(things)
     update = oidc.require_login(update)
-    move = oidc.require_login(move)
     delete = oidc.require_login(delete)
 
 app.run(host="0.0.0.0", port=port, debug=debug)

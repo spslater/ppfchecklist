@@ -1,4 +1,12 @@
-<title>{% block title %}{{ typeList }} List{% endblock %}</title>
+<title>
+{% block title %}
+  {% if typeList is defined %}
+    {{ typeList }} List
+  {% else %}
+    {{ title }}
+  {% endif %}
+{% endblock %}
+</title>
 <link
   rel="stylesheet"
   href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
@@ -6,9 +14,7 @@
   crossorigin="anonymous"
 />
 <script
-  src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
-  integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
-  crossorigin="anonymous"
+  src="https://code.jquery.com/jquery-3.6.0.min.js"
 ></script>
 <script
   src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"
