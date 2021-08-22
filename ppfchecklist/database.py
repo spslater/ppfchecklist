@@ -24,7 +24,7 @@ class Database(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def info(self, table: str):
+    def info(self, table: str, limit: int):
         raise NotImplementedError
 
     # @abstractmethod
@@ -308,7 +308,7 @@ class DatabaseSqlite3(Database):
             """
         )
 
-    def info(self, table: str):
+    def info(self, table: str, limit: int = None):
         results = []
         for status in self.status(table):
             result = self._execute(
@@ -342,7 +342,7 @@ class DatabaseSqlite3(Database):
                     "status": status["name"],
                     "status_id": status["rowid"],
                     "orderByPosition": status["orderByPosition"],
-                    "rows": result,
+                    "rows": result[limit*-1:] if (limit and not status["orderByPosition"]) else result,
                 }
             )
         return results
