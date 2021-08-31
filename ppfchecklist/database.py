@@ -284,6 +284,10 @@ class DatabaseSqlite3(Database):
             "Entry": [dict(v) for v in self._execute("SELECT rowid, * FROM Entry")],
         }
 
+    def is_table(self, name):
+        return name in [table["name"] for table in self.tables()]
+
+
     def tables(self):
         return self._execute(
             """SELECT rowid, name
