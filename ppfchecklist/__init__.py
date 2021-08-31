@@ -123,8 +123,9 @@ def things(thing: str):
     logging.info("GET /%s\t%s", thing, get_ip(request))
 
     db = get_db()
+    if not db.is_table(thing):
+        return redirect("/")
     results = db.info(thing)
-
     return render_template(
         "things.html.j2",
         thing=db.table(thing),
@@ -158,6 +159,7 @@ def delete(thing: str):
     logging.info("DELETE\t%s - %s", ipaddr, thing)
     return redirect(f"/list/{thing}")
 
+
 @app.route("/settings", methods=["GET", "POST"])
 def settings():
     db = get_db()
@@ -166,6 +168,14 @@ def settings():
         return render_template("settings.html.j2", settings=settings)
     res = db.set_settings(request.form)
     return redirect("/")
+
+
+@app.route("/<string:unknown>", methods=["GET"])
+def unknown(unknown: str):
+    is_table = get_db().is_table(unknown)
+    redirect_url = f"/list/{unknown}" if is_table else "/"
+    return redirect(redirect_url)
+
 
 def get_db():
     db = getattr(g, "_database", None)
