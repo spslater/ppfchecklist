@@ -23,7 +23,7 @@ from .database import DatabaseSqlite3
 
 RequestForm = ImmutableMultiDict[str, str]
 
-app = Flask(__name__, static_url_path="")
+app = Flask(__name__, static_url_path="/static")
 
 
 def getenv_bool(key, default=None):

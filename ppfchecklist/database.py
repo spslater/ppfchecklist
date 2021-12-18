@@ -582,7 +582,6 @@ class DatabaseSqlite3(Database):
         statusList = []
         for status in statuses:
             statusList.append(dict(status))
-        print(statusList)
         statusList = sorted(statusList, key=lambda i: i["position"])
 
         tableDict = {}
@@ -606,44 +605,39 @@ class DatabaseSqlite3(Database):
         statuses = []
         for idx, og in enumerate(statusOrder):
             pre = f"status_{og}"
-            if form[f"{pre}_name"]:
-                statuses.append(
-                    {
-                        "rowid": og if og <= numStatuses else 0,
-                        "name": form[f"{pre}_name"],
-                        "orderByPosition": form.get(f"{pre}_orderByPosition") == "on",
-                        "og_name": form.get(f"{pre}_og_name", ""),
-                        "og_position": int(form.get(f"{pre}_og_position", 0)),
-                    }
-                )
-
-        for idx, status in enumerate(statuses):
-            status["position"] = idx + 1
-
-        statuses = [
-            s
-            for s in statuses
-            if s["name"] != s["og_name"] or s["position"] != s["og_position"]
-        ]
+            name = form[f"{pre}_name"]
+            if name:
+                og_name = form.get(f"{pre}_og_name", "")
+                pos = idx + 1
+                og_pos = int(form.get(f"{pre}_og_position", 0))
+                order = form.get(f"{pre}_orderByPosition") == "on"
+                og_order = form.get(f"{pre}_og_orderByPosition") == "on"
+                if name != og_name or pos != og_pos or order != og_order:
+                    statuses.append(
+                        {
+                            "rowid": og if og <= numStatuses else 0,
+                            "name": name,
+                            "position": pos,
+                            "orderByPosition": order,
+                        }
+                    )
 
         statusUpdate, statusInsert = partition(lambda i: i["rowid"] == 0, statuses)
-        statusUpdate = [(s["name"], s["position"], s["rowid"]) for s in statusUpdate]
+        statusUpdate = [(s["name"], s["position"], s["orderByPosition"], s["rowid"]) for s in statusUpdate]
         statusInsert = [
             (s["name"], s["position"], s["orderByPosition"]) for s in statusInsert
         ]
 
-        print(statusUpdate)
         if statusUpdate:
             self._executemany(
                 """
                 UPDATE Status
-                SET name = ?, position = ?
+                SET name = ?, position = ?, orderByPosition = ?
                 WHERE rowid = ?
                 """,
                 statusUpdate,
             )
 
-        print(statusInsert)
         if statusInsert:
             self._executemany(
                 """
@@ -656,26 +650,20 @@ class DatabaseSqlite3(Database):
         tables = []
         for idx, og in enumerate(tableOrder):
             pre = f"table_{og}"
-
-            if form[f"{pre}_name"]:
-                tables.append(
-                    {
-                        "rowid": og if og <= numTables else 0,
-                        "name": form[f"{pre}_name"],
-                        "active": form.get(f"{pre}_active") == "on",
-                        "og_name": form.get(f"{pre}_name", ""),
-                        "og_position": int(form.get(f"{pre}_position", 0)),
-                    }
-                )
-
-        for idx, table in enumerate(tables):
-            table["position"] = idx + 1
-
-        tables = [
-            t
-            for t in tables
-            if t["name"] != t["og_name"] or t["position"] != t["og_position"]
-        ]
+            name = form[f"{pre}_name"]
+            if name:
+                og_name = form.get(f"{pre}_og_name", "")
+                pos = idx + 1
+                og_pos = int(form.get(f"{pre}_og_position", 0))
+                if name != og_name or pos != og_pos:
+                    tables.append(
+                        {
+                            "rowid": og if og <= numTables else 0,
+                            "name": name,
+                            "active": form.get(f"{pre}_active") == "on",
+                            "position": pos
+                        }
+                    )
 
         tableUpdate, tableInsert = partition(lambda i: i["rowid"] == 0, tables)
         tableUpdate = [
@@ -683,7 +671,6 @@ class DatabaseSqlite3(Database):
         ]
         tableInsert = [(t["name"], t["position"], t["active"]) for t in tableInsert]
 
-        print(tableUpdate)
         if tableUpdate:
             self._executemany(
                 """
@@ -694,7 +681,6 @@ class DatabaseSqlite3(Database):
                 tableUpdate,
             )
 
-        print(tableInsert)
         if tableInsert:
             self._executemany(
                 """
