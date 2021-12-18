@@ -74,14 +74,12 @@
                 />
               </td>
               <td>
-                {% if status.orderByPosition %}✓{% else %}☓{% endif %}
                 <input
                   class="form-control"
                   type="checkbox"
                   name="status_{{status.rowid}}_orderByPosition"
                   id="status_{{status.rowid}}_orderByPosition"
                   {% if status.orderByPosition %}checked{% endif %}
-                  hidden
                 />
               </td>
             </tr>
