@@ -215,33 +215,4 @@ logging.basicConfig(
     handlers=handler_list,
 )
 
-if getenv_bool("PPF_AUTHORIZE", False):
-    logging.debug("Setting up authorizing via OpenID Connect")
-    from flask_oidc import OpenIDConnect
-
-    app.config.update(
-        {
-            "SECRET_KEY": getenv("SECRET_KEY", "SUPERSECRETKEYTELLNOONE"),
-            "TESTING": debug,
-            "DEBUG": debug,
-            "OIDC_CLIENT_SECRETS": getenv("OIDC_CLIENT_SECRETS"),
-            "OIDC_ID_TOKEN_COOKIE_SECURE": True,
-            "OIDC_REQUIRE_VERIFIED_EMAIL": False,
-            "OIDC_USER_INFO_ENABLED": True,
-            "OIDC_VALID_ISSUERS": getenv("OIDC_VALID_ISSUERS"),
-            "OIDC_OPENID_REALM": getenv("OIDC_OPENID_REALM"),
-            "OIDC_SCOPES": "openid",
-            "OIDC_INTROSPECTION_AUTH_METHOD": "client_secret_post",
-        }
-    )
-    oidc = OpenIDConnect()
-    oidc.init_app(app)
-
-    index = oidc.require_login(index)
-    dump = oidc.require_login(dump)
-    upload = oidc.require_login(upload)
-    things = oidc.require_login(things)
-    update = oidc.require_login(update)
-    delete = oidc.require_login(delete)
-
 app.run(host="0.0.0.0", port=port, debug=debug)

@@ -10,5 +10,4 @@ services:
       - 5000:80
     volumes:
       - ./.flaskenv:/usr/src/app/.flaskenv
-      - ./client_secrets.json.sample:/usr/src/app/client_secrets.json
       - ./sqlite.db:/usr/src/app/sqlite.db

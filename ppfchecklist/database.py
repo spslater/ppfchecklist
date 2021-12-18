@@ -68,15 +68,6 @@ class DatabaseSqlite3(Database):
                     orderByPosition INT
                 )"""
             )
-            # self._executemany(
-            #     "INSERT INTO Status VALUES (?,?,?)",
-            #     [
-            #         ("In Progress", 1, True),
-            #         ("Planned", 2, True),
-            #         ("Done", 3, False),
-            #         ("Dropped", 4, False),
-            #     ],
-            # )
         except sqlite3.OperationalError as e:
             if "already exists" not in str(e):
                 logging.debug(e)
@@ -334,7 +325,7 @@ class DatabaseSqlite3(Database):
                     ON Status.rowid = Entry.status
                     AND Status.rowid = ?
                 ORDER BY
-                    CASE 
+                    CASE
                         WHEN Status.orderByPosition == 1 THEN Entry.position
                         WHEN Status.orderByPosition == 0 THEN Entry.date
                     END ASC
@@ -723,3 +714,4 @@ class DatabaseSqlite3(Database):
                 "insert": tableInsert,
             },
         }
+
