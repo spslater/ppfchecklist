@@ -10,7 +10,7 @@ pip install -r requirements.txt
 Upgrading from the previous TinyDB version of PPF Checklist just requires going to the `/upload` endpoint and selecting the old database. The tables will be in alphabetical order instead of the order assigned previously.
 
 ## Usage
-```py -m flask run``
+```py -m flask run```
 
 PPF Checklist loads it's settings from environment variables set. It defaults to using for a
 `.flaskenv` and `.env` file
@@ -40,12 +40,6 @@ like going from `tvshows` to `animated` and `live action`.
 
 ### Delete
 Can delete items from a list if no longer being tracked.
-
-## Single-Sign-On Authentication
-SSO authentication can be enabled with the `-a` or `--authorize` flag.
-It defaults to using a file named `client_secrets.json`.
-When that is enabled, the `sso` json file with the client secretes must be preset.
-See `client_secrets.json.sample` for an example file structure.
 
 ## Docker
 `Dockerfile` to build the application and sample `docker-compose.yml.sample` are provided.
