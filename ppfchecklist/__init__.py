@@ -4,7 +4,7 @@ from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from datetime import datetime
 from json import load
 from os import getenv
-from os.path import join
+from pathlib import Path
 from sys import maxsize, stdout
 
 from dotenv import load_dotenv
@@ -77,6 +77,9 @@ def favicon():
         mimetype="image/vnd.microsoft.icon",
     )
 
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok"})
 
 @app.route("/download", methods=["GET"])
 def dump():
@@ -184,14 +187,15 @@ def get_db():
     return db
 
 
-port = getenv_int("PPF_PORT", 80)
-debug = getenv_bool("PPF_DEBUG", False)
 
-basedir = getenv("PPF_BASEDIR", ".")
+basedir = Path(getenv("PPF_BASEDIR", "."))
+if not basedir.exists():
+    basedir.mkdir(parents=True, exist_ok=True)
 
 output_file = getenv("PPF_LOGFILE", None)
 if output_file and output_file[0] != "/":
-    output_file = join(basedir, output_file)
+    output_file = basedir / output_file
+        
 
 handler_list = (
     [logging.StreamHandler(stdout), logging.FileHandler(output_file)]
@@ -215,5 +219,3 @@ logging.basicConfig(
     handlers=handler_list,
 )
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=port, debug=debug)

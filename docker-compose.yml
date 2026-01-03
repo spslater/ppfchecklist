@@ -1,0 +1,11 @@
+services:
+
+  app:
+    # if built locally just `ppfchecklist` needs to be used
+    image: ghcr.io/spslater/ppfchecklist:latest
+    build: .
+    hostname: ppfchecklist
+    ports:
+      - 8080:80
+    volumes:
+      - ./data:/usr/src/app/data

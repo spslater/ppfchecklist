@@ -1,0 +1,5 @@
+PPF_BIND="0.0.0.0:80"
+PPF_BASEDIR="data"
+PPF_DATABASE="sqlite.db"
+PPF_LOGFILE="output.log"
+PPF_LOGLEVEL="DEBUG"
