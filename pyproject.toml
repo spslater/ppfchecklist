@@ -1,0 +1,12 @@
+[project]
+name = "ppfchecklist"
+version = "2.1.0"
+description = "Track what you want to watch and when you watched something"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "flask>=3.0",
+    "gunicorn>=23.0.0",
+    "more-itertools>=10.5",
+    "python-dotenv>=1.0",
+]
